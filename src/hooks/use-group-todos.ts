@@ -23,10 +23,24 @@ export function useCreateGroupTodo(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ title, completionType }: { title: string; completionType: "single" | "all" }) => {
+    mutationFn: async ({ title, completionType, dueDate, dueTime, recurrence }: {
+      title: string;
+      completionType: "single" | "all";
+      dueDate?: string;
+      dueTime?: string;
+      recurrence?: string;
+    }) => {
       const { error } = await supabase
         .from("group_todos")
-        .insert({ group_id: groupId!, created_by: user!.id, title, completion_type: completionType });
+        .insert({
+          group_id: groupId!,
+          created_by: user!.id,
+          title,
+          completion_type: completionType,
+          due_date: dueDate || null,
+          due_time: dueTime || null,
+          recurrence: recurrence || null,
+        });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["group-todos", groupId] }),
