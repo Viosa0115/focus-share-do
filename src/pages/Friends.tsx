@@ -1,9 +1,6 @@
 import { useState } from "react";
-import { UserPlus, Search, Check, X, Users as UsersIcon } from "lucide-react";
+import { UserPlus, Check, X, Users as UsersIcon } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import BottomNav from "@/components/BottomNav";
 
 const Friends = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const { data: friends = [] } = useFriends();
   const { data: requests = [] } = useFriendRequests();
@@ -20,37 +16,7 @@ const Friends = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [hashtag, setHashtag] = useState("");
 
-  // Get profiles for friends
-  const friendIds = friends.map((f: any) => f.friend_id);
-  const { data: friendProfiles = [] } = useQuery({
-    queryKey: ["friend-profiles", friendIds],
-    queryFn: async () => {
-      if (!friendIds.length) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("user_id", friendIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: friendIds.length > 0,
-  });
-
-  // Get profiles for requests
-  const requesterIds = requests.map((r: any) => r.requester_id);
-  const { data: requesterProfiles = [] } = useQuery({
-    queryKey: ["requester-profiles", requesterIds],
-    queryFn: async () => {
-      if (!requesterIds.length) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("user_id", requesterIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: requesterIds.length > 0,
-  });
+  const acceptedFriends = (friends as any[]).filter((f: any) => f.status === "accepted");
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +51,12 @@ const Friends = () => {
                   maxLength={9}
                   className="h-12 rounded-xl bg-secondary border-0 text-center text-lg tracking-widest font-mono text-foreground"
                 />
-                <Button type="submit" className="w-full h-12 rounded-xl" disabled={hashtag.replace("#", "").length !== 8}>
-                  Anfrage senden
+                <Button
+                  type="submit"
+                  className="w-full h-12 rounded-xl"
+                  disabled={hashtag.replace("#", "").length !== 8 || sendRequest.isPending}
+                >
+                  {sendRequest.isPending ? "Sendet..." : "Anfrage senden"}
                 </Button>
               </form>
             </DialogContent>
@@ -96,11 +66,13 @@ const Friends = () => {
 
       <div className="max-w-lg mx-auto px-5 py-6 space-y-6">
         {/* Friend Requests */}
-        {requests.length > 0 && (
+        {(requests as any[]).length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Anfragen ({requests.length})</h3>
-            {requests.map((req: any) => {
-              const profile = requesterProfiles.find((p: any) => p.user_id === req.requester_id);
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Anfragen ({(requests as any[]).length})
+            </h3>
+            {(requests as any[]).map((req: any) => {
+              const profile = req.requester_profile;
               return (
                 <div key={req.id} className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft">
                   <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
@@ -113,12 +85,16 @@ const Friends = () => {
                     <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => respondRequest.mutate({ id: req.id, accept: true })}
-                      className="h-8 w-8 rounded-full bg-success flex items-center justify-center text-success-foreground">
+                    <button
+                      onClick={() => respondRequest.mutate({ id: req.id, accept: true })}
+                      className="h-8 w-8 rounded-full bg-success flex items-center justify-center text-success-foreground"
+                    >
                       <Check className="h-4 w-4" />
                     </button>
-                    <button onClick={() => respondRequest.mutate({ id: req.id, accept: false })}
-                      className="h-8 w-8 rounded-full bg-destructive flex items-center justify-center text-destructive-foreground">
+                    <button
+                      onClick={() => respondRequest.mutate({ id: req.id, accept: false })}
+                      className="h-8 w-8 rounded-full bg-destructive flex items-center justify-center text-destructive-foreground"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
@@ -130,27 +106,32 @@ const Friends = () => {
 
         {/* Friends list */}
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Freunde ({friends.length})</h3>
-          {friends.length === 0 ? (
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Freunde ({acceptedFriends.length})
+          </h3>
+          {acceptedFriends.length === 0 ? (
             <div className="text-center py-12 space-y-2">
               <UsersIcon className="h-10 w-10 mx-auto text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">Noch keine Freunde</p>
               <p className="text-xs text-muted-foreground">Füge Freunde über ihren Hashtag-Code hinzu</p>
             </div>
           ) : (
-            friendProfiles.map((profile: any) => (
-              <div key={profile.user_id} className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft">
-                <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
-                  <span className="text-sm font-medium text-secondary-foreground">
-                    {profile.display_name?.charAt(0)?.toUpperCase() || "?"}
-                  </span>
+            acceptedFriends.map((f: any) => {
+              const profile = f.friend_profile;
+              return (
+                <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft">
+                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                    <span className="text-sm font-medium text-secondary-foreground">
+                      {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{profile?.display_name || "Unbekannt"}</p>
+                    <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{profile.display_name}</p>
-                  <p className="text-[10px] text-muted-foreground">#{profile.hashtag_code}</p>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

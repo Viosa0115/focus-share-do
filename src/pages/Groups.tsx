@@ -46,25 +46,33 @@ const Groups = () => {
 
       const { data, error } = await supabase
         .from("groups")
-        .insert({ name, description, owner_id: user!.id, join_code: code, has_todos: hasTodos, has_challenges: hasChallenges, has_events: hasEvents })
+        .insert({ name: name.trim(), description: description.trim(), owner_id: user!.id, join_code: code, has_todos: hasTodos, has_challenges: hasChallenges, has_events: hasEvents })
         .select()
         .single();
       if (error) throw error;
 
-      await supabase.from("group_members").insert({
+      const { error: memberError } = await supabase.from("group_members").insert({
         group_id: data.id,
         user_id: user!.id,
         role: "admin",
       });
+      if (memberError) throw memberError;
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["groups"] });
       setShowCreate(false);
       setName("");
       setDescription("");
+      setHasTodos(true);
+      setHasChallenges(false);
+      setHasEvents(false);
       toast({ title: "Gruppe erstellt! 🎉" });
+      navigate(`/groups/${data.id}`);
+    },
+    onError: (e: any) => {
+      toast({ title: "Fehler beim Erstellen", description: e.message, variant: "destructive" });
     },
   });
 

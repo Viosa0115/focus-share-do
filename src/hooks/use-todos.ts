@@ -23,10 +23,20 @@ export function useCreateTodo() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (title: string) => {
+    mutationFn: async (payload: {
+      title: string;
+      due_date?: string;
+      due_time?: string;
+      recurrence?: string;
+    }) => {
       const { error } = await supabase
         .from("todos")
-        .insert({ title, user_id: user!.id });
+        .insert({
+          title: payload.title,
+          user_id: user!.id,
+          due_date: payload.due_date || null,
+          recurrence: payload.recurrence || null,
+        });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["todos"] }),
