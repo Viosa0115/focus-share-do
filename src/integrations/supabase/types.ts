@@ -240,8 +240,44 @@ export type Database = {
           },
         ]
       }
+      group_join_requests: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_join_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_members: {
         Row: {
+          can_challenges: boolean
+          can_chat: boolean
+          can_events: boolean
+          can_todos: boolean
           group_id: string
           id: string
           joined_at: string
@@ -249,6 +285,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          can_challenges?: boolean
+          can_chat?: boolean
+          can_events?: boolean
+          can_todos?: boolean
           group_id: string
           id?: string
           joined_at?: string
@@ -256,6 +296,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          can_challenges?: boolean
+          can_chat?: boolean
+          can_events?: boolean
+          can_todos?: boolean
           group_id?: string
           id?: string
           joined_at?: string
@@ -565,6 +609,10 @@ export type Database = {
     Functions: {
       generate_hashtag_code: { Args: never; Returns: string }
       generate_join_code: { Args: never; Returns: string }
+      is_group_admin: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Users, Copy } from "lucide-react";
+import { Plus, Users, Bell } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useJoinRequests, useRespondJoinRequest, useCreateJoinRequest } from "@/hooks/use-join-requests";
 import BottomNav from "@/components/BottomNav";
 
 const Groups = () => {
@@ -18,12 +19,17 @@ const Groups = () => {
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [hasTodos, setHasTodos] = useState(true);
   const [hasChallenges, setHasChallenges] = useState(false);
   const [hasEvents, setHasEvents] = useState(false);
+
+  const { data: joinRequests = [] } = useJoinRequests();
+  const respondRequest = useRespondJoinRequest();
+  const createJoinRequest = useCreateJoinRequest();
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["groups", user?.id],
@@ -90,10 +96,19 @@ const Groups = () => {
     mutationFn: async () => {
       const { data: group, error } = await supabase
         .from("groups")
-        .select("id, max_members")
+        .select("id, max_members, owner_id")
         .eq("join_code", joinCode.toUpperCase())
         .single();
       if (error || !group) throw new Error("Code ungültig");
+
+      // Check if already member
+      const { data: existing } = await supabase
+        .from("group_members")
+        .select("id")
+        .eq("group_id", group.id)
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (existing) throw new Error("Du bist bereits Mitglied");
 
       // Check member count
       const { count } = await supabase
@@ -104,18 +119,13 @@ const Groups = () => {
         throw new Error("Diese Gruppe ist voll (max. 15 Mitglieder)");
       }
 
-      const { error: joinError } = await supabase.from("group_members").insert({
-        group_id: group.id,
-        user_id: user!.id,
-        role: "member",
-      });
-      if (joinError) throw joinError;
+      // Send join request instead of directly joining
+      await createJoinRequest.mutateAsync(group.id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["groups"] });
       setShowJoin(false);
       setJoinCode("");
-      toast({ title: "Gruppe beigetreten! 🎉" });
+      toast({ title: "Beitrittsanfrage gesendet! ✉️", description: "Der Admin der Gruppe muss deine Anfrage bestätigen." });
     },
     onError: (e: any) => {
       toast({ title: "Fehler", description: e.message, variant: "destructive" });
@@ -129,6 +139,47 @@ const Groups = () => {
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-foreground">Gruppen</h1>
             <div className="flex gap-2">
+              {/* Join Requests Badge */}
+              {joinRequests.length > 0 && (
+                <Dialog open={showRequests} onOpenChange={setShowRequests}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-xl text-xs relative">
+                      <Bell className="h-4 w-4" />
+                      <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center">
+                        {joinRequests.length}
+                      </span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-2xl">
+                    <DialogHeader><DialogTitle>Beitrittsanfragen</DialogTitle></DialogHeader>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {joinRequests.map((req: any) => (
+                        <div key={req.id} className="p-3 rounded-xl bg-secondary space-y-2">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {req.profile?.display_name || "Nutzer"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              möchte „{req.group_name}" beitreten
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="flex-1 rounded-xl h-8 text-xs"
+                              onClick={() => respondRequest.mutate({ requestId: req.id, accept: true, groupId: req.group_id, userId: req.user_id })}>
+                              Annehmen
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 rounded-xl h-8 text-xs"
+                              onClick={() => respondRequest.mutate({ requestId: req.id, accept: false, groupId: req.group_id, userId: req.user_id })}>
+                              Ablehnen
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+
               <Dialog open={showJoin} onOpenChange={setShowJoin}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="rounded-xl text-xs">Beitreten</Button>
@@ -138,7 +189,10 @@ const Groups = () => {
                   <form onSubmit={(e) => { e.preventDefault(); joinGroup.mutate(); }} className="space-y-4">
                     <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="6-stelliger Code" maxLength={6}
                       className="h-12 rounded-xl bg-secondary border-0 text-center text-lg tracking-widest uppercase text-foreground" />
-                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={joinCode.length !== 6}>Beitreten</Button>
+                    <p className="text-xs text-muted-foreground text-center">Der Admin der Gruppe erhält eine Beitrittsanfrage</p>
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={joinCode.length !== 6 || joinGroup.isPending}>
+                      {joinGroup.isPending ? "..." : "Anfrage senden"}
+                    </Button>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -171,7 +225,9 @@ const Groups = () => {
                         <Switch checked={hasEvents} onCheckedChange={setHasEvents} />
                       </div>
                     </div>
-                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim()}>Erstellen</Button>
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim() || createGroup.isPending}>
+                      {createGroup.isPending ? "..." : "Erstellen"}
+                    </Button>
                   </form>
                 </DialogContent>
               </Dialog>
