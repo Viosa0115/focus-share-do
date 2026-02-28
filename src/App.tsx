@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Groups from "./pages/Groups";
+import GroupDetail from "./pages/GroupDetail";
+import Friends from "./pages/Friends";
 import News from "./pages/News";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -49,6 +51,8 @@ const App = () => (
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
+            <Route path="/groups/:id" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
+            <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
             <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
