@@ -30,10 +30,20 @@ const Groups = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("group_members")
-        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, created_at)")
+        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, max_members, created_at)")
         .eq("user_id", user!.id);
       if (error) throw error;
-      return data.map((gm: any) => ({ ...gm.groups, role: gm.role }));
+
+      const groupsWithCount = await Promise.all(
+        data.map(async (gm: any) => {
+          const { count } = await supabase
+            .from("group_members")
+            .select("*", { count: "exact", head: true })
+            .eq("group_id", gm.group_id);
+          return { ...gm.groups, role: gm.role, member_count: count ?? 0 };
+        })
+      );
+      return groupsWithCount;
     },
     enabled: !!user,
   });
@@ -80,10 +90,19 @@ const Groups = () => {
     mutationFn: async () => {
       const { data: group, error } = await supabase
         .from("groups")
-        .select("id")
+        .select("id, max_members")
         .eq("join_code", joinCode.toUpperCase())
         .single();
       if (error || !group) throw new Error("Code ungültig");
+
+      // Check member count
+      const { count } = await supabase
+        .from("group_members")
+        .select("*", { count: "exact", head: true })
+        .eq("group_id", group.id);
+      if (count !== null && count >= (group as any).max_members) {
+        throw new Error("Diese Gruppe ist voll (max. 15 Mitglieder)");
+      }
 
       const { error: joinError } = await supabase.from("group_members").insert({
         group_id: group.id,
@@ -187,7 +206,10 @@ const Groups = () => {
                     {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
                   </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
+                  <span className="text-[10px] text-muted-foreground">{group.member_count}/{group.max_members ?? 15} 👥</span>
+                </div>
               </div>
             </button>
           ))

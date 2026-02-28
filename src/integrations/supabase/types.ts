@@ -390,6 +390,7 @@ export type Database = {
           has_todos: boolean
           id: string
           join_code: string
+          max_members: number
           name: string
           owner_id: string
         }
@@ -402,6 +403,7 @@ export type Database = {
           has_todos?: boolean
           id?: string
           join_code: string
+          max_members?: number
           name: string
           owner_id: string
         }
@@ -414,6 +416,7 @@ export type Database = {
           has_todos?: boolean
           id?: string
           join_code?: string
+          max_members?: number
           name?: string
           owner_id?: string
         }
