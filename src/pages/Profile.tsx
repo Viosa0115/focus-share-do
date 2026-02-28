@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import BottomNav from "@/components/BottomNav";
@@ -18,6 +19,7 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   const startEdit = () => {
     setDisplayName(profile?.display_name || "");
@@ -39,17 +41,27 @@ const Profile = () => {
     toast({ title: "Profil aktualisiert ✓" });
   };
 
+  const togglePrivacy = async (isPrivate: boolean) => {
+    setSavingPrivacy(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_private: isPrivate })
+      .eq("user_id", user!.id);
+    setSavingPrivacy(false);
+    if (error) {
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["profile"] });
+    toast({ title: isPrivate ? "Konto ist jetzt privat 🔒" : "Konto ist jetzt öffentlich 🌐" });
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-lg mx-auto px-5 py-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-foreground">Profil</h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={signOut}
-            className="text-muted-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground">
             <LogOut className="h-4 w-4 mr-1" /> Abmelden
           </Button>
         </div>
@@ -124,6 +136,35 @@ const Profile = () => {
             </p>
           </div>
         )}
+
+        {/* Privacy Setting */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <p className="text-sm font-medium text-foreground">Datenschutz</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {profile?.is_private ? (
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Globe className="h-4 w-4 text-muted-foreground" />
+              )}
+              <div>
+                <p className="text-sm text-foreground">
+                  {profile?.is_private ? "Privates Konto" : "Öffentliches Konto"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {profile?.is_private
+                    ? "Nur Freunde können deine Beiträge sehen"
+                    : "Jeder kann deine Beiträge sehen"}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={profile?.is_private ?? false}
+              onCheckedChange={togglePrivacy}
+              disabled={savingPrivacy}
+            />
+          </div>
+        </div>
 
         {/* Email */}
         <div className="p-4 rounded-2xl bg-card shadow-soft">

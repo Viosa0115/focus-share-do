@@ -339,8 +339,11 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          due_date: string | null
+          due_time: string | null
           group_id: string
           id: string
+          recurrence: string | null
           title: string
         }
         Insert: {
@@ -348,8 +351,11 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          due_date?: string | null
+          due_time?: string | null
           group_id: string
           id?: string
+          recurrence?: string | null
           title: string
         }
         Update: {
@@ -357,8 +363,11 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          due_date?: string | null
+          due_time?: string | null
           group_id?: string
           id?: string
+          recurrence?: string | null
           title?: string
         }
         Relationships: [
@@ -410,6 +419,64 @@ export type Database = {
         }
         Relationships: []
       }
+      posts: {
+        Row: {
+          content: string
+          created_at: string
+          group_id: string | null
+          group_todo_id: string | null
+          id: string
+          image_url: string | null
+          tagged_user_ids: string[] | null
+          todo_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          group_id?: string | null
+          group_todo_id?: string | null
+          id?: string
+          image_url?: string | null
+          tagged_user_ids?: string[] | null
+          todo_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          group_id?: string | null
+          group_todo_id?: string | null
+          id?: string
+          image_url?: string | null
+          tagged_user_ids?: string[] | null
+          todo_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_group_todo_id_fkey"
+            columns: ["group_todo_id"]
+            isOneToOne: false
+            referencedRelation: "group_todos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_todo_id_fkey"
+            columns: ["todo_id"]
+            isOneToOne: false
+            referencedRelation: "todos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -418,6 +485,7 @@ export type Database = {
           display_name: string
           hashtag_code: string
           id: string
+          is_private: boolean
           updated_at: string
           user_id: string
         }
@@ -428,6 +496,7 @@ export type Database = {
           display_name?: string
           hashtag_code: string
           id?: string
+          is_private?: boolean
           updated_at?: string
           user_id: string
         }
@@ -438,6 +507,7 @@ export type Database = {
           display_name?: string
           hashtag_code?: string
           id?: string
+          is_private?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -449,8 +519,10 @@ export type Database = {
           created_at: string
           description: string | null
           due_date: string | null
+          due_time: string | null
           id: string
           pinned: boolean
+          recurrence: string | null
           title: string
           updated_at: string
           user_id: string
@@ -460,8 +532,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           id?: string
           pinned?: boolean
+          recurrence?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -471,8 +545,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           id?: string
           pinned?: boolean
+          recurrence?: string | null
           title?: string
           updated_at?: string
           user_id?: string
