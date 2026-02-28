@@ -1,0 +1,59 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
+
+export function useTodos() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["todos", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("todos")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useCreateTodo() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (title: string) => {
+      const { error } = await supabase
+        .from("todos")
+        .insert({ title, user_id: user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todos"] }),
+  });
+}
+
+export function useToggleTodo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) => {
+      const { error } = await supabase
+        .from("todos")
+        .update({ completed })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todos"] }),
+  });
+}
+
+export function useDeleteTodo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("todos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todos"] }),
+  });
+}
