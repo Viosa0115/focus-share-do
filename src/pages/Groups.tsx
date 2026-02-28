@@ -3,8 +3,10 @@ import { Plus, Users, Copy } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import BottomNav from "@/components/BottomNav";
@@ -13,18 +15,22 @@ const Groups = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [joinCode, setJoinCode] = useState("");
+  const [hasTodos, setHasTodos] = useState(true);
+  const [hasChallenges, setHasChallenges] = useState(false);
+  const [hasEvents, setHasEvents] = useState(false);
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["groups", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("group_members")
-        .select("group_id, role, groups(id, name, description, join_code, owner_id, created_at)")
+        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, created_at)")
         .eq("user_id", user!.id);
       if (error) throw error;
       return data.map((gm: any) => ({ ...gm.groups, role: gm.role }));
@@ -34,19 +40,17 @@ const Groups = () => {
 
   const createGroup = useMutation({
     mutationFn: async () => {
-      // Generate join code
       const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
       let code = "";
       for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
 
       const { data, error } = await supabase
         .from("groups")
-        .insert({ name, description, owner_id: user!.id, join_code: code })
+        .insert({ name, description, owner_id: user!.id, join_code: code, has_todos: hasTodos, has_challenges: hasChallenges, has_events: hasEvents })
         .select()
         .single();
       if (error) throw error;
 
-      // Add creator as admin member
       await supabase.from("group_members").insert({
         group_id: data.id,
         user_id: user!.id,
@@ -100,62 +104,47 @@ const Groups = () => {
             <div className="flex gap-2">
               <Dialog open={showJoin} onOpenChange={setShowJoin}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="rounded-xl text-xs">
-                    Beitreten
-                  </Button>
+                  <Button variant="outline" size="sm" className="rounded-xl text-xs">Beitreten</Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Gruppe beitreten</DialogTitle>
-                  </DialogHeader>
-                  <form
-                    onSubmit={(e) => { e.preventDefault(); joinGroup.mutate(); }}
-                    className="space-y-4"
-                  >
-                    <Input
-                      value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value)}
-                      placeholder="6-stelliger Code"
-                      maxLength={6}
-                      className="h-12 rounded-xl bg-secondary border-0 text-center text-lg tracking-widest uppercase text-foreground"
-                    />
-                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={joinCode.length !== 6}>
-                      Beitreten
-                    </Button>
+                  <DialogHeader><DialogTitle>Gruppe beitreten</DialogTitle></DialogHeader>
+                  <form onSubmit={(e) => { e.preventDefault(); joinGroup.mutate(); }} className="space-y-4">
+                    <Input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="6-stelliger Code" maxLength={6}
+                      className="h-12 rounded-xl bg-secondary border-0 text-center text-lg tracking-widest uppercase text-foreground" />
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={joinCode.length !== 6}>Beitreten</Button>
                   </form>
                 </DialogContent>
               </Dialog>
 
               <Dialog open={showCreate} onOpenChange={setShowCreate}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="rounded-xl text-xs">
-                    <Plus className="h-4 w-4 mr-1" /> Neu
-                  </Button>
+                  <Button size="sm" className="rounded-xl text-xs"><Plus className="h-4 w-4 mr-1" /> Neu</Button>
                 </DialogTrigger>
                 <DialogContent className="rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Neue Gruppe</DialogTitle>
-                  </DialogHeader>
-                  <form
-                    onSubmit={(e) => { e.preventDefault(); createGroup.mutate(); }}
-                    className="space-y-4"
-                  >
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Gruppenname"
-                      required
-                      className="h-12 rounded-xl bg-secondary border-0 text-foreground"
-                    />
-                    <Input
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Beschreibung (optional)"
-                      className="h-12 rounded-xl bg-secondary border-0 text-foreground"
-                    />
-                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim()}>
-                      Erstellen
-                    </Button>
+                  <DialogHeader><DialogTitle>Neue Gruppe</DialogTitle></DialogHeader>
+                  <form onSubmit={(e) => { e.preventDefault(); createGroup.mutate(); }} className="space-y-4">
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gruppenname" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Beschreibung (optional)" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <div className="space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground">Funktionen</p>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-foreground">Chat</span>
+                        <span className="text-xs text-muted-foreground">Immer aktiv</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-foreground">Aufgaben</span>
+                        <Switch checked={hasTodos} onCheckedChange={setHasTodos} />
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-foreground">Challenges</span>
+                        <Switch checked={hasChallenges} onCheckedChange={setHasChallenges} />
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-foreground">Events</span>
+                        <Switch checked={hasEvents} onCheckedChange={setHasEvents} />
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim()}>Erstellen</Button>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -166,9 +155,7 @@ const Groups = () => {
 
       <div className="max-w-lg mx-auto px-5 py-6 space-y-3">
         {isLoading ? (
-          [1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />
-          ))
+          [1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)
         ) : groups.length === 0 ? (
           <div className="text-center py-16 space-y-2">
             <Users className="h-10 w-10 mx-auto text-muted-foreground/50" />
@@ -177,9 +164,10 @@ const Groups = () => {
           </div>
         ) : (
           groups.map((group: any) => (
-            <div
+            <button
               key={group.id}
-              className="p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card"
+              onClick={() => navigate(`/groups/${group.id}`)}
+              className="w-full text-left p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -188,23 +176,12 @@ const Groups = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
-                    {group.description && (
-                      <p className="text-xs text-muted-foreground">{group.description}</p>
-                    )}
+                    {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(group.join_code);
-                    toast({ title: "Code kopiert!" });
-                  }}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Copy className="h-3 w-3" />
-                  {group.join_code}
-                </button>
+                <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>
