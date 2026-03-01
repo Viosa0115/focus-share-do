@@ -23,10 +23,23 @@ export function useCreatePersonalChallenge() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ name, challenge_type }: { name: string; challenge_type: string }) => {
+    mutationFn: async ({ name, challenge_type, label_id, end_date, end_time }: {
+      name: string;
+      challenge_type: string;
+      label_id?: string;
+      end_date?: string;
+      end_time?: string;
+    }) => {
       const { error } = await supabase
         .from("personal_challenges")
-        .insert({ user_id: user!.id, name, challenge_type });
+        .insert({
+          user_id: user!.id,
+          name,
+          challenge_type,
+          label_id: label_id || null,
+          end_date: end_date || null,
+          end_time: end_time || null,
+        } as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["personal-challenges"] }),

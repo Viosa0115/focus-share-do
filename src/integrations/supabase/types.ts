@@ -495,14 +495,50 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_challenge_times: {
+        Row: {
+          challenge_id: string
+          id: string
+          recorded_at: string
+          time_ms: number
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          id?: string
+          recorded_at?: string
+          time_ms: number
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          id?: string
+          recorded_at?: string
+          time_ms?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_challenge_times_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "personal_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personal_challenges: {
         Row: {
           best_time_ms: number | null
           challenge_type: string
           created_at: string
+          end_date: string | null
+          end_time: string | null
           ended_at: string | null
           given_up: boolean
           id: string
+          label_id: string | null
+          longest_time_ms: number | null
           name: string
           score: number
           started_at: string | null
@@ -512,9 +548,13 @@ export type Database = {
           best_time_ms?: number | null
           challenge_type: string
           created_at?: string
+          end_date?: string | null
+          end_time?: string | null
           ended_at?: string | null
           given_up?: boolean
           id?: string
+          label_id?: string | null
+          longest_time_ms?: number | null
           name: string
           score?: number
           started_at?: string | null
@@ -524,15 +564,27 @@ export type Database = {
           best_time_ms?: number | null
           challenge_type?: string
           created_at?: string
+          end_date?: string | null
+          end_time?: string | null
           ended_at?: string | null
           given_up?: boolean
           id?: string
+          label_id?: string | null
+          longest_time_ms?: number | null
           name?: string
           score?: number
           started_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "personal_challenges_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "todo_labels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_comments: {
         Row: {
@@ -731,6 +783,54 @@ export type Database = {
           },
         ]
       }
+      todo_completions: {
+        Row: {
+          completed_at: string
+          description: string | null
+          id: string
+          label_id: string | null
+          recurrence: string | null
+          title: string
+          todo_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          description?: string | null
+          id?: string
+          label_id?: string | null
+          recurrence?: string | null
+          title: string
+          todo_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          description?: string | null
+          id?: string
+          label_id?: string | null
+          recurrence?: string | null
+          title?: string
+          todo_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "todo_completions_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "todo_labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "todo_completions_todo_id_fkey"
+            columns: ["todo_id"]
+            isOneToOne: false
+            referencedRelation: "todos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       todo_labels: {
         Row: {
           color: string
@@ -754,6 +854,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      todo_streaks: {
+        Row: {
+          best_streak: number
+          created_at: string
+          current_streak: number
+          id: string
+          last_completed_period: string | null
+          recurrence: string
+          todo_id: string | null
+          todo_title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          best_streak?: number
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_completed_period?: string | null
+          recurrence?: string
+          todo_id?: string | null
+          todo_title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          best_streak?: number
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_completed_period?: string | null
+          recurrence?: string
+          todo_id?: string | null
+          todo_title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "todo_streaks_todo_id_fkey"
+            columns: ["todo_id"]
+            isOneToOne: false
+            referencedRelation: "todos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       todos: {
         Row: {
