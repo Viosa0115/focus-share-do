@@ -433,6 +433,8 @@ export type Database = {
       }
       group_flashbacks: {
         Row: {
+          allow_photos: boolean
+          allow_videos: boolean
           created_at: string
           created_by: string
           description: string | null
@@ -442,6 +444,8 @@ export type Database = {
           unlock_at: string
         }
         Insert: {
+          allow_photos?: boolean
+          allow_videos?: boolean
           created_at?: string
           created_by: string
           description?: string | null
@@ -451,6 +455,8 @@ export type Database = {
           unlock_at: string
         }
         Update: {
+          allow_photos?: boolean
+          allow_videos?: boolean
           created_at?: string
           created_by?: string
           description?: string | null
@@ -797,6 +803,54 @@ export type Database = {
           name?: string
           owner_id?: string
           spotify_playlist_url?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          from_user_id: string | null
+          from_user_name: string | null
+          group_id: string | null
+          group_name: string | null
+          id: string
+          read: boolean
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          from_user_id?: string | null
+          from_user_name?: string | null
+          group_id?: string | null
+          group_name?: string | null
+          id?: string
+          read?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          from_user_id?: string | null
+          from_user_name?: string | null
+          group_id?: string | null
+          group_name?: string | null
+          id?: string
+          read?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
         }
         Relationships: []
       }
