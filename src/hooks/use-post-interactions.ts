@@ -2,6 +2,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 
+async function attachProfilesToRows<T extends { user_id: string }>(rows: T[]) {
+  if (!rows.length) return rows.map((row) => ({ ...row, profiles: null }));
+
+  const userIds = Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean)));
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, avatar_url")
+    .in("user_id", userIds);
+
+  if (error) {
+    return rows.map((row) => ({ ...row, profiles: null }));
+  }
+
+  const byUserId = new Map((profiles ?? []).map((profile: any) => [profile.user_id, profile]));
+  return rows.map((row) => ({
+    ...row,
+    profiles: byUserId.get(row.user_id) ?? null,
+  }));
+}
 export function usePostLikes(postId: string) {
   return useQuery({
     queryKey: ["post-likes", postId],
@@ -51,12 +70,16 @@ export function useAllPostLikes(postIds: string[]) {
         .from("post_likes")
         .select("*, profiles:user_id(display_name, avatar_url)")
         .in("post_id", postIds);
-      if (error) {
-        const { data: d2, error: e2 } = await supabase.from("post_likes").select("*").in("post_id", postIds);
-        if (e2) throw e2;
-        return d2;
-      }
-      return data;
+
+      if (!error && data) return data;
+
+      const { data: rawLikes, error: rawLikesError } = await supabase
+        .from("post_likes")
+        .select("*")
+        .in("post_id", postIds);
+      if (rawLikesError) throw rawLikesError;
+
+      return attachProfilesToRows((rawLikes ?? []) as any[]);
     },
     enabled: postIds.length > 0,
   });
@@ -71,17 +94,17 @@ export function usePostComments(postId: string) {
         .select("*, profiles:user_id(display_name, avatar_url)")
         .eq("post_id", postId)
         .order("created_at", { ascending: true });
-      if (error) {
-        // Fallback without join
-        const { data: comments, error: e2 } = await supabase
-          .from("post_comments")
-          .select("*")
-          .eq("post_id", postId)
-          .order("created_at", { ascending: true });
-        if (e2) throw e2;
-        return comments;
-      }
-      return data;
+
+      if (!error && data) return data;
+
+      const { data: comments, error: commentsError } = await supabase
+        .from("post_comments")
+        .select("*")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+      if (commentsError) throw commentsError;
+
+      return attachProfilesToRows((comments ?? []) as any[]);
     },
   });
 }

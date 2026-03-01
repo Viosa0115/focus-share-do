@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +62,12 @@ const GroupDetail = () => {
     { key: "settings", label: "Settings", icon: Settings, show: true },
   ];
 
-  const [activeTab, setActiveTab] = useState<TabKey>("chat");
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab: TabKey = tabParam && ["chat", "todos", "challenges", "events", "flashback", "settings"].includes(tabParam)
+    ? (tabParam as TabKey)
+    : "chat";
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   if (!id) return null;
 
@@ -130,6 +135,8 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
     return (member as any)?.profiles?.display_name || "Nutzer";
   };
 
+  const isVideoUrl = (url?: string | null) => !!url && /\.(mp4|webm|mov|m4v|avi|mkv)(\?|$)/i.test(url);
+
   const handleSendImage = async (e: React.ChangeEvent<HTMLInputElement>, isSnap: boolean) => {
     const file = e.target.files?.[0];
     if (!file || !canChat) return;
@@ -140,9 +147,10 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
       const { error: uploadErr } = await supabase.storage.from("chat-images").upload(path, file);
       if (uploadErr) throw uploadErr;
       const { data: urlData } = supabase.storage.from("chat-images").getPublicUrl(path);
+      const mediaLabel = file.type.startsWith("video") ? (isSnap ? "🎥 Snap" : "🎬 Video") : (isSnap ? "📸 Snap" : "📷 Bild");
       const { error } = await supabase.from("group_messages").insert({
         group_id: groupId, user_id: user!.id,
-        content: isSnap ? "📸 Snap" : "📷 Bild",
+        content: mediaLabel,
         image_url: urlData.publicUrl, is_snap: isSnap, viewed_by: [], saved_by: [],
       } as any);
       if (error) throw error;
@@ -219,7 +227,11 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
                       </button>
                     ) : (
                       <div className="relative">
-                        <img src={msg.image_url} alt="" className={`max-w-full rounded-2xl ${isOwn ? "rounded-br-md" : "rounded-bl-md"}`} />
+                        {isVideoUrl(msg.image_url) ? (
+                          <video src={msg.image_url} controls className={`max-w-full rounded-2xl ${isOwn ? "rounded-br-md" : "rounded-bl-md"}`} />
+                        ) : (
+                          <img src={msg.image_url} alt="" className={`max-w-full rounded-2xl ${isOwn ? "rounded-br-md" : "rounded-bl-md"}`} />
+                        )}
                         {isSnap && (
                           <div className="absolute top-2 right-2">
                             <button onClick={() => handleSaveSnap(msg)} className="h-7 w-7 rounded-full bg-background/70 flex items-center justify-center backdrop-blur-sm">
@@ -247,7 +259,11 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
 
       {viewSnap && (
         <div className="fixed inset-0 z-50 bg-background/95 flex flex-col items-center justify-center" onClick={() => setViewSnap(null)}>
-          <img src={viewSnap.image_url} alt="" className="max-w-full max-h-[70vh] rounded-2xl" />
+          {isVideoUrl(viewSnap.image_url) ? (
+            <video src={viewSnap.image_url} controls className="max-w-full max-h-[70vh] rounded-2xl" />
+          ) : (
+            <img src={viewSnap.image_url} alt="" className="max-w-full max-h-[70vh] rounded-2xl" />
+          )}
           <div className="mt-4 flex gap-3">
             <Button size="sm" variant="outline" className="rounded-xl" onClick={(e) => { e.stopPropagation(); handleSaveSnap(viewSnap); }}>
               <Download className="h-3 w-3 mr-1" /> Speichern
@@ -264,12 +280,12 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
           <div className="max-w-lg mx-auto flex gap-2">
             <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
               <Camera className="h-4 w-4 text-muted-foreground" />
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
+              <input type="file" accept="image/*,video/*" capture="environment" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
             </label>
             <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Nachricht..." className="h-10 rounded-xl bg-secondary border-0 text-sm text-foreground" />
             <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
               <Plus className="h-4 w-4 text-muted-foreground" />
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSendImage(e, false)} disabled={uploading} />
+              <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleSendImage(e, false)} disabled={uploading} />
             </label>
             <button type="submit" disabled={!text.trim()} className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center transition-transform active:scale-95 disabled:opacity-40 flex-shrink-0">
               <Send className="h-4 w-4" />
@@ -910,20 +926,26 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
   const isCreator = flashback.created_by === user?.id;
   const fbAllowPhotos = (flashback as any).allow_photos !== false;
   const fbAllowVideos = (flashback as any).allow_videos !== false;
-  const acceptTypes = [...(fbAllowPhotos ? ["image/*"] : []), ...(fbAllowVideos ? ["video/*"] : [])].join(",") || "image/*,video/*";
+  const galleryAcceptTypes = [
+    ...(fbAllowPhotos ? ["image/*"] : []),
+    ...(fbAllowVideos ? ["video/*"] : []),
+  ].join(",");
+  const galleryUploadsAllowed = !!galleryAcceptTypes;
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, source: "upload" | "camera") => {
     const files = e.target.files;
     if (!files) return;
     setUploading(true);
     for (const file of Array.from(files)) {
-      if (file.type.startsWith("image") && !fbAllowPhotos) {
-        toast({ title: "Fotos sind für diesen Flashback deaktiviert", variant: "destructive" });
-        continue;
-      }
-      if (file.type.startsWith("video") && !fbAllowVideos) {
-        toast({ title: "Videos sind für diesen Flashback deaktiviert", variant: "destructive" });
-        continue;
+      if (source === "upload") {
+        if (file.type.startsWith("image") && !fbAllowPhotos) {
+          toast({ title: "Foto-Uploads sind für diesen Flashback deaktiviert", variant: "destructive" });
+          continue;
+        }
+        if (file.type.startsWith("video") && !fbAllowVideos) {
+          toast({ title: "Video-Uploads sind für diesen Flashback deaktiviert", variant: "destructive" });
+          continue;
+        }
       }
       await uploadMedia.mutateAsync(file);
     }
@@ -962,17 +984,26 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
             </p>
             <label className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:bg-secondary/30 transition-colors">
               <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">{fbAllowPhotos && fbAllowVideos ? "Fotos & Videos hochladen" : fbAllowPhotos ? "Fotos hochladen" : "Videos hochladen"}</span>
-              <input type="file" accept={acceptTypes} multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+              <span className="text-sm text-muted-foreground">
+                {galleryUploadsAllowed
+                  ? (fbAllowPhotos && fbAllowVideos ? "Fotos & Videos hochladen" : fbAllowPhotos ? "Fotos hochladen" : "Videos hochladen")
+                  : "Uploads aus Galerie deaktiviert"}
+              </span>
+              <input type="file" accept={galleryAcceptTypes || "image/*,video/*"} multiple className="hidden" onChange={(e) => handleUpload(e, "upload")} disabled={uploading || !galleryUploadsAllowed} />
               {uploading && <div className="mt-2 h-4 w-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />}
             </label>
-            {fbAllowPhotos && (
+            <div className="grid grid-cols-2 gap-2">
               <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
                 <Camera className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Kamera öffnen</span>
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} disabled={uploading} />
+                <span className="text-xs text-muted-foreground">Foto mit Kamera</span>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleUpload(e, "camera")} disabled={uploading} />
               </label>
-            )}
+              <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
+                <Camera className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Video mit Kamera</span>
+                <input type="file" accept="video/*" capture="environment" className="hidden" onChange={(e) => handleUpload(e, "camera")} disabled={uploading} />
+              </label>
+            </div>
             <p className="text-[10px] text-muted-foreground text-center">{(media as any[]).length} Medien hochgeladen</p>
           </div>
         )}
@@ -1001,16 +1032,21 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
                 {/* Also allow uploading more after unlock */}
                 <label className="flex items-center justify-center py-4 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
                   <Plus className="h-4 w-4 text-muted-foreground mr-1" />
-                  <span className="text-xs text-muted-foreground">Mehr hochladen</span>
-                  <input type="file" accept={acceptTypes} multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+                  <span className="text-xs text-muted-foreground">{galleryUploadsAllowed ? "Mehr hochladen" : "Uploads aus Galerie deaktiviert"}</span>
+                  <input type="file" accept={galleryAcceptTypes || "image/*,video/*"} multiple className="hidden" onChange={(e) => handleUpload(e, "upload")} disabled={uploading || !galleryUploadsAllowed} />
                 </label>
-                {fbAllowPhotos && (
+                <div className="grid grid-cols-2 gap-2">
                   <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
                     <Camera className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Kamera</span>
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} disabled={uploading} />
+                    <span className="text-xs text-muted-foreground">Foto mit Kamera</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleUpload(e, "camera")} disabled={uploading} />
                   </label>
-                )}
+                  <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
+                    <Camera className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Video mit Kamera</span>
+                    <input type="file" accept="video/*" capture="environment" className="hidden" onChange={(e) => handleUpload(e, "camera")} disabled={uploading} />
+                  </label>
+                </div>
               </div>
             )}
           </>
