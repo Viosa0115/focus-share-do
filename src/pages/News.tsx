@@ -24,12 +24,19 @@ const iconMap: Record<string, any> = {
   member: Users, default: Bell,
 };
 const colorMap: Record<string, string> = {
-  like: "text-destructive", comment: "text-blue-500", respect: "text-amber-500",
-  new_todo: "text-emerald-500", todo: "text-emerald-500",
-  new_challenge: "text-amber-500", challenge: "text-amber-500",
-  new_event: "text-blue-500", event: "text-blue-500",
-  new_flashback: "text-violet-500", group_added: "text-primary",
-  member: "text-violet-500", default: "text-muted-foreground",
+  like: "text-destructive",
+  comment: "text-primary",
+  respect: "text-primary",
+  new_todo: "text-primary",
+  todo: "text-primary",
+  new_challenge: "text-primary",
+  challenge: "text-primary",
+  new_event: "text-primary",
+  event: "text-primary",
+  new_flashback: "text-primary",
+  group_added: "text-primary",
+  member: "text-primary",
+  default: "text-muted-foreground",
 };
 
 const News = () => {
@@ -71,7 +78,28 @@ const News = () => {
 
   const handleNotificationClick = (item: any) => {
     if (item._source === "notification" && !item.read) markRead.mutate(item.id);
-    if (item.group_id) navigate(`/groups/${item.group_id}`);
+
+    const referenceType = item.reference_type || item.type;
+    const tabByType: Record<string, string> = {
+      new_todo: "todos",
+      todo: "todos",
+      group_todo: "todos",
+      new_challenge: "challenges",
+      challenge: "challenges",
+      new_event: "events",
+      event: "events",
+      new_flashback: "flashback",
+      flashback: "flashback",
+    };
+
+    if (item.group_id) {
+      const tab = tabByType[referenceType];
+      const params = new URLSearchParams();
+      if (tab) params.set("tab", tab);
+      if (item.reference_id) params.set("ref", item.reference_id);
+      const query = params.toString();
+      navigate(query ? `/groups/${item.group_id}?${query}` : `/groups/${item.group_id}`);
+    }
   };
 
   return (

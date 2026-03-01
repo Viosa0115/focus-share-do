@@ -24,16 +24,47 @@ export function useCreateFlashback(groupId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { title: string; description?: string; unlock_at: string; allow_photos?: boolean; allow_videos?: boolean }) => {
-      const { error } = await supabase.from("group_flashbacks").insert({
-        group_id: groupId!,
-        created_by: user!.id,
-        title: params.title,
-        description: params.description || "",
-        unlock_at: params.unlock_at,
-        allow_photos: params.allow_photos ?? true,
-        allow_videos: params.allow_videos ?? true,
-      } as any);
+      const { data: createdFlashback, error } = await supabase
+        .from("group_flashbacks")
+        .insert({
+          group_id: groupId!,
+          created_by: user!.id,
+          title: params.title,
+          description: params.description || "",
+          unlock_at: params.unlock_at,
+          allow_photos: params.allow_photos ?? true,
+          allow_videos: params.allow_videos ?? true,
+        } as any)
+        .select("id, title")
+        .single();
       if (error) throw error;
+
+      const [{ data: members }, { data: group }, { data: profile }] = await Promise.all([
+        supabase.from("group_members").select("user_id").eq("group_id", groupId!),
+        supabase.from("groups").select("name").eq("id", groupId!).maybeSingle(),
+        supabase.from("profiles").select("display_name").eq("user_id", user!.id).maybeSingle(),
+      ]);
+
+      const creatorName = profile?.display_name || "Jemand";
+      const groupName = group?.name || "Gruppe";
+      const recipients = (members ?? []).map((member: any) => member.user_id).filter((id: string) => id !== user!.id);
+
+      if (recipients.length > 0) {
+        await supabase.from("notifications").insert(
+          recipients.map((recipientId: string) => ({
+            user_id: recipientId,
+            type: "new_flashback",
+            title: "Neuer Flashback erstellt ✨",
+            body: `${creatorName} hat "${createdFlashback.title}" in ${groupName} erstellt`,
+            from_user_id: user!.id,
+            from_user_name: creatorName,
+            reference_type: "flashback",
+            reference_id: createdFlashback.id,
+            group_id: groupId!,
+            group_name: groupName,
+          })) as any
+        );
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["flashbacks", groupId] }),
   });

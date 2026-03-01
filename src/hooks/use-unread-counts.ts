@@ -7,7 +7,7 @@ export function useUnreadDMCount() {
   return useQuery({
     queryKey: ["unread-dm-count", user?.id],
     queryFn: async () => {
-      const lastSeen = localStorage.getItem(`dm_last_seen_${user!.id}`) || new Date().toISOString();
+      const lastSeen = localStorage.getItem(`dm_last_seen_${user!.id}`) || "1970-01-01T00:00:00.000Z";
       const { count, error } = await supabase
         .from("direct_messages")
         .select("*", { count: "exact", head: true })
@@ -26,7 +26,7 @@ export function useUnreadGroupMessageCount() {
   return useQuery({
     queryKey: ["unread-group-msg-count", user?.id],
     queryFn: async () => {
-      const lastSeen = localStorage.getItem(`group_msg_last_seen_${user!.id}`) || new Date().toISOString();
+      const lastSeen = localStorage.getItem(`group_msg_last_seen_${user!.id}`) || "1970-01-01T00:00:00.000Z";
       const { count, error } = await supabase
         .from("group_messages")
         .select("*", { count: "exact", head: true })

@@ -24,10 +24,39 @@ export function useCreateChallenge(groupId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { name: string; challenge_type: "count" | "time" | "endurance"; start_date: string; duration_days: number }) => {
-      const { error } = await supabase
+      const { data: createdChallenge, error } = await supabase
         .from("challenges")
-        .insert({ ...params, group_id: groupId!, created_by: user!.id });
+        .insert({ ...params, group_id: groupId!, created_by: user!.id })
+        .select("id, name")
+        .single();
       if (error) throw error;
+
+      const [{ data: members }, { data: group }, { data: profile }] = await Promise.all([
+        supabase.from("group_members").select("user_id").eq("group_id", groupId!),
+        supabase.from("groups").select("name").eq("id", groupId!).maybeSingle(),
+        supabase.from("profiles").select("display_name").eq("user_id", user!.id).maybeSingle(),
+      ]);
+
+      const creatorName = profile?.display_name || "Jemand";
+      const groupName = group?.name || "Gruppe";
+      const recipients = (members ?? []).map((member: any) => member.user_id).filter((id: string) => id !== user!.id);
+
+      if (recipients.length > 0) {
+        await supabase.from("notifications").insert(
+          recipients.map((recipientId: string) => ({
+            user_id: recipientId,
+            type: "new_challenge",
+            title: "Neue Challenge erstellt 🏆",
+            body: `${creatorName} hat "${createdChallenge.name}" in ${groupName} erstellt`,
+            from_user_id: user!.id,
+            from_user_name: creatorName,
+            reference_type: "challenge",
+            reference_id: createdChallenge.id,
+            group_id: groupId!,
+            group_name: groupName,
+          })) as any
+        );
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["challenges", groupId] }),
   });

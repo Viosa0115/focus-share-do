@@ -24,10 +24,39 @@ export function useCreateEvent(groupId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { name: string; description: string; event_date: string; start_time: string; end_time: string }) => {
-      const { error } = await supabase
+      const { data: createdEvent, error } = await supabase
         .from("group_events")
-        .insert({ ...params, group_id: groupId!, created_by: user!.id });
+        .insert({ ...params, group_id: groupId!, created_by: user!.id })
+        .select("id, name")
+        .single();
       if (error) throw error;
+
+      const [{ data: members }, { data: group }, { data: profile }] = await Promise.all([
+        supabase.from("group_members").select("user_id").eq("group_id", groupId!),
+        supabase.from("groups").select("name").eq("id", groupId!).maybeSingle(),
+        supabase.from("profiles").select("display_name").eq("user_id", user!.id).maybeSingle(),
+      ]);
+
+      const creatorName = profile?.display_name || "Jemand";
+      const groupName = group?.name || "Gruppe";
+      const recipients = (members ?? []).map((member: any) => member.user_id).filter((id: string) => id !== user!.id);
+
+      if (recipients.length > 0) {
+        await supabase.from("notifications").insert(
+          recipients.map((recipientId: string) => ({
+            user_id: recipientId,
+            type: "new_event",
+            title: "Neues Event erstellt 📅",
+            body: `${creatorName} hat "${createdEvent.name}" in ${groupName} erstellt`,
+            from_user_id: user!.id,
+            from_user_name: creatorName,
+            reference_type: "event",
+            reference_id: createdEvent.id,
+            group_id: groupId!,
+            group_name: groupName,
+          })) as any
+        );
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["group-events", groupId] }),
   });
