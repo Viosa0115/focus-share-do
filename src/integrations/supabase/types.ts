@@ -101,33 +101,42 @@ export type Database = {
       }
       challenges: {
         Row: {
+          accepted_by: string[] | null
           challenge_type: string
           created_at: string
           created_by: string
+          declined_by: string[] | null
           duration_days: number
           group_id: string
           id: string
           name: string
+          reset_interval: string | null
           start_date: string
         }
         Insert: {
+          accepted_by?: string[] | null
           challenge_type: string
           created_at?: string
           created_by: string
+          declined_by?: string[] | null
           duration_days?: number
           group_id: string
           id?: string
           name: string
+          reset_interval?: string | null
           start_date: string
         }
         Update: {
+          accepted_by?: string[] | null
           challenge_type?: string
           created_at?: string
           created_by?: string
+          declined_by?: string[] | null
           duration_days?: number
           group_id?: string
           id?: string
           name?: string
+          reset_interval?: string | null
           start_date?: string
         }
         Relationships: [
@@ -1019,6 +1028,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          expires_at: string | null
           group_id: string | null
           group_todo_id: string | null
           id: string
@@ -1030,6 +1040,7 @@ export type Database = {
         Insert: {
           content?: string
           created_at?: string
+          expires_at?: string | null
           group_id?: string | null
           group_todo_id?: string | null
           id?: string
@@ -1041,6 +1052,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          expires_at?: string | null
           group_id?: string | null
           group_todo_id?: string | null
           id?: string

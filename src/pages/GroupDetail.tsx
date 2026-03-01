@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useGroupMessages, useSendMessage } from "@/hooks/use-group-chat";
 import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo } from "@/hooks/use-group-todos";
-import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp } from "@/hooks/use-challenges";
+import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp, useAcceptEndurance, useDeclineEndurance } from "@/hooks/use-challenges";
 import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
 import { useGroupMembers } from "@/hooks/use-group-members";
 import { useGroupLists, useCreateGroupList, useDeleteGroupList } from "@/hooks/use-group-lists";
@@ -556,6 +556,8 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
   const updateScore = useUpdateScore(groupId);
   const saveTime = useSaveTime(groupId);
   const giveUp = useGiveUp(groupId);
+  const acceptEndurance = useAcceptEndurance(groupId);
+  const declineEndurance = useDeclineEndurance(groupId);
   const { data: members = [] } = useGroupMembers(groupId);
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
@@ -563,6 +565,7 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
   const [type, setType] = useState<"count" | "time" | "endurance">("count");
   const [days, setDays] = useState("7");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [resetInterval, setResetInterval] = useState<string>("none");
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState(0);
   const [timerElapsed, setTimerElapsed] = useState(0);
@@ -608,14 +611,19 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
               <DialogHeader><DialogTitle>Neue Challenge</DialogTitle></DialogHeader>
               <form onSubmit={(e) => {
                 e.preventDefault();
-                createChallenge.mutate({ name, challenge_type: type, start_date: new Date(startDate).toISOString(), duration_days: parseInt(days) });
-                setName(""); setShowCreate(false);
+                createChallenge.mutate({
+                  name, challenge_type: type,
+                  start_date: new Date(startDate).toISOString(),
+                  duration_days: parseInt(days),
+                  reset_interval: type === "count" && resetInterval !== "none" ? resetInterval : undefined,
+                });
+                setName(""); setResetInterval("none"); setShowCreate(false);
               }} className="space-y-4">
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="Name der Challenge" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">Typ</label>
                   <div className="flex gap-2">
-                    {([["count", "Zählen", "Zählbare Aktionen"], ["time", "Zeit", "Schnellste Zeit"], ["endurance", "Durchhalten", "Wer hält länger"]] as const).map(([val, label, desc]) => (
+                    {([["count", "Zählen", "Zählbare Aktionen"], ["time", "Zeit", "Schnellste Zeit"], ["endurance", "Durchhalten", "Alle müssen annehmen"]] as const).map(([val, label, desc]) => (
                       <button key={val} type="button" onClick={() => setType(val)}
                         className={`flex-1 py-2 px-1 rounded-xl text-xs font-medium transition-colors ${type === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
                         <div>{label}</div>
@@ -624,6 +632,19 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
                     ))}
                   </div>
                 </div>
+                {type === "count" && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Counter Reset</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[{ val: "none", label: "Nie" }, { val: "daily", label: "Täglich" }, { val: "weekly", label: "Wöchentlich" }, { val: "monthly", label: "Monatlich" }, { val: "yearly", label: "Jährlich" }].map(({ val, label }) => (
+                        <button key={val} type="button" onClick={() => setResetInterval(val)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${resetInterval === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <Input value={startDate} onChange={e => setStartDate(e.target.value)} type="date" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <Input value={days} onChange={e => setDays(e.target.value)} type="number" min="1" max="365" placeholder="Dauer (Tage)" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim()}>Erstellen</Button>
@@ -644,6 +665,18 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
           {challenges.map((ch: any) => {
             const participants = ch.challenge_participants || [];
             const myPart = participants.find((p: any) => p.user_id === user?.id);
+            const acceptedBy: string[] = (ch as any).accepted_by || [];
+            const declinedBy: string[] = (ch as any).declined_by || [];
+            const totalMembers = members.length;
+            const isEndurance = ch.challenge_type === "endurance";
+            const allAccepted = isEndurance && acceptedBy.length + declinedBy.length >= totalMembers;
+            const myAccepted = acceptedBy.includes(user?.id || "");
+            const myDeclined = declinedBy.includes(user?.id || "");
+            const enduranceStarted = isEndurance && allAccepted;
+
+            // Count challenge: find highest scorer for crown
+            const countHighest = ch.challenge_type === "count" ? participants.reduce((best: any, p: any) => (!best || (p.score || 0) > (best.score || 0)) ? p : best, null) : null;
+
             const sorted = [...participants].sort((a: any, b: any) => {
               if (ch.challenge_type === "count") return (b.score || 0) - (a.score || 0);
               if (ch.challenge_type === "time") return (a.best_time_ms || Infinity) - (b.best_time_ms || Infinity);
@@ -659,14 +692,37 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
                     <h4 className="font-medium text-sm text-foreground">{ch.name}</h4>
                     <p className="text-[10px] text-muted-foreground">
                       {ch.challenge_type === "count" ? "🔢 Zählen" : ch.challenge_type === "time" ? "⏱️ Beste Zeit" : "💪 Durchhalten"} · {ch.duration_days} Tage · Start: {format(new Date(ch.start_date), "dd.MM.yyyy")}
+                      {(ch as any).reset_interval && (ch as any).reset_interval !== "none" && ` · Reset: ${(ch as any).reset_interval === "daily" ? "Täglich" : (ch as any).reset_interval === "weekly" ? "Wöchentlich" : (ch as any).reset_interval === "monthly" ? "Monatlich" : "Jährlich"}`}
                     </p>
                   </div>
                   <Trophy className="h-4 w-4 text-muted-foreground" />
                 </div>
 
-                {!myPart ? (
+                {/* Endurance: acceptance phase */}
+                {isEndurance && !allAccepted && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">
+                      Warten auf Annahme: {acceptedBy.length}/{totalMembers - declinedBy.length} angenommen
+                    </p>
+                    {!myAccepted && !myDeclined && (
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 rounded-xl" onClick={() => acceptEndurance.mutate(ch.id)}>
+                          ✓ Annehmen
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 rounded-xl" onClick={() => declineEndurance.mutate(ch.id)}>
+                          ✗ Ablehnen
+                        </Button>
+                      </div>
+                    )}
+                    {myAccepted && <p className="text-[10px] text-primary text-center">Du hast angenommen ✓</p>}
+                    {myDeclined && <p className="text-[10px] text-muted-foreground text-center">Du hast abgelehnt</p>}
+                  </div>
+                )}
+
+                {/* Non-endurance or accepted endurance: normal join/play UI */}
+                {(!isEndurance || enduranceStarted) && !myPart ? (
                   <Button size="sm" className="w-full rounded-xl" onClick={() => canChallenges && joinChallenge.mutate(ch.id)} disabled={!canChallenges}>Teilnehmen</Button>
-                ) : (
+                ) : (!isEndurance || enduranceStarted) && myPart ? (
                   <>
                     {ch.challenge_type === "count" && (
                       <div className="flex items-center justify-center gap-6 py-2">
@@ -709,21 +765,27 @@ function ChallengesTab({ groupId, canChallenges }: { groupId: string; canChallen
                       <p className="text-center text-sm text-muted-foreground py-2">Aufgegeben nach {formatDuration(new Date(myPart.started_at), new Date(myPart.ended_at))}</p>
                     )}
                   </>
-                )}
+                ) : null}
 
                 {sorted.length > 0 && (
                   <div className="space-y-1.5 pt-3 border-t border-border">
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Rangliste</p>
-                    {sorted.map((p: any, idx: number) => (
-                      <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-secondary/50">
-                        <span className="text-foreground">{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`} {getDisplayName(p.user_id)}</span>
-                        <span className="text-muted-foreground tabular-nums font-mono">
-                          {ch.challenge_type === "count" && (p.score || 0)}
-                          {ch.challenge_type === "time" && (p.best_time_ms ? formatMs(p.best_time_ms) : "—")}
-                          {ch.challenge_type === "endurance" && (p.given_up ? formatDuration(new Date(p.started_at), new Date(p.ended_at)) : "⏳ Läuft...")}
-                        </span>
-                      </div>
-                    ))}
+                    {sorted.map((p: any, idx: number) => {
+                      const hasCrown = ch.challenge_type === "count" && countHighest && p.user_id === countHighest.user_id && (p.score || 0) > 0;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-secondary/50">
+                          <span className="text-foreground">
+                            {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}.`} {getDisplayName(p.user_id)}
+                            {hasCrown && " 👑"}
+                          </span>
+                          <span className="text-muted-foreground tabular-nums font-mono">
+                            {ch.challenge_type === "count" && (p.score || 0)}
+                            {ch.challenge_type === "time" && (p.best_time_ms ? formatMs(p.best_time_ms) : "—")}
+                            {ch.challenge_type === "endurance" && (p.given_up ? formatDuration(new Date(p.started_at), new Date(p.ended_at)) : "⏳ Läuft...")}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
