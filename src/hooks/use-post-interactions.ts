@@ -49,9 +49,13 @@ export function useAllPostLikes(postIds: string[]) {
       if (!postIds.length) return [];
       const { data, error } = await supabase
         .from("post_likes")
-        .select("*")
+        .select("*, profiles:user_id(display_name, avatar_url)")
         .in("post_id", postIds);
-      if (error) throw error;
+      if (error) {
+        const { data: d2, error: e2 } = await supabase.from("post_likes").select("*").in("post_id", postIds);
+        if (e2) throw e2;
+        return d2;
+      }
       return data;
     },
     enabled: postIds.length > 0,
