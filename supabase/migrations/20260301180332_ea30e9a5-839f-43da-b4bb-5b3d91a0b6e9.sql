@@ -1,0 +1,1 @@
+ALTER TABLE public.group_members ADD COLUMN IF NOT EXISTS position integer NOT NULL DEFAULT 0;

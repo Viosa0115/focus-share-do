@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Users, Bell } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Users, Bell, GripVertical } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -27,6 +27,8 @@ const Groups = () => {
   const [hasChallenges, setHasChallenges] = useState(false);
   const [hasEvents, setHasEvents] = useState(false);
   const [hasFlashbacks, setHasFlashbacks] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { data: joinRequests = [] } = useJoinRequests();
   const respondRequest = useRespondJoinRequest();
@@ -37,7 +39,7 @@ const Groups = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("group_members")
-        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, max_members, created_at, avatar_url)")
+        .select("group_id, role, position, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, max_members, created_at, avatar_url)")
         .eq("user_id", user!.id);
       if (error) throw error;
 
@@ -47,13 +49,49 @@ const Groups = () => {
             .from("group_members")
             .select("*", { count: "exact", head: true })
             .eq("group_id", gm.group_id);
-          return { ...gm.groups, role: gm.role, member_count: count ?? 0 };
+          return { ...gm.groups, role: gm.role, member_count: count ?? 0, position: gm.position ?? 0, membership_id: gm.group_id };
         })
       );
-      return groupsWithCount;
+      return groupsWithCount.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
     },
     enabled: !!user,
   });
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = async (index: number) => {
+    if (dragIndex === null || dragIndex === index) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newGroups = [...groups];
+    const [moved] = newGroups.splice(dragIndex, 1);
+    newGroups.splice(index, 0, moved);
+
+    // Update positions in DB
+    await Promise.all(
+      newGroups.map(async (g: any, i: number) => {
+        await supabase
+          .from("group_members")
+          .update({ position: i } as any)
+          .eq("group_id", g.id)
+          .eq("user_id", user!.id);
+      })
+    );
+
+    qc.invalidateQueries({ queryKey: ["groups"] });
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
 
   const createGroup = useMutation({
     mutationFn: async () => {
@@ -72,7 +110,8 @@ const Groups = () => {
         group_id: data.id,
         user_id: user!.id,
         role: "admin",
-      });
+        position: groups.length,
+      } as any);
       if (memberError) throw memberError;
 
       return data;
@@ -103,7 +142,6 @@ const Groups = () => {
         .single();
       if (error || !group) throw new Error("Code ungültig");
 
-      // Check if already member
       const { data: existing } = await supabase
         .from("group_members")
         .select("id")
@@ -112,7 +150,6 @@ const Groups = () => {
         .maybeSingle();
       if (existing) throw new Error("Du bist bereits Mitglied");
 
-      // Check member count
       const { count } = await supabase
         .from("group_members")
         .select("*", { count: "exact", head: true })
@@ -121,7 +158,6 @@ const Groups = () => {
         throw new Error("Diese Gruppe ist voll (max. 15 Mitglieder)");
       }
 
-      // Send join request instead of directly joining
       await createJoinRequest.mutateAsync(group.id);
     },
     onSuccess: () => {
@@ -141,7 +177,6 @@ const Groups = () => {
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-foreground">Gruppen</h1>
             <div className="flex gap-2">
-              {/* Join Requests Badge */}
               {joinRequests.length > 0 && (
                 <Dialog open={showRequests} onOpenChange={setShowRequests}>
                   <DialogTrigger asChild>
@@ -252,32 +287,43 @@ const Groups = () => {
             <p className="text-xs text-muted-foreground">Erstelle eine Gruppe oder tritt einer bei</p>
           </div>
         ) : (
-          groups.map((group: any) => (
-            <button
+          groups.map((group: any, index: number) => (
+            <div
               key={group.id}
-              onClick={() => navigate(`/groups/${group.id}`)}
-              className="w-full text-left p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card active:scale-[0.98]"
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+              className={`w-full text-left p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card ${
+                dragOverIndex === index ? "border-2 border-primary" : ""
+              } ${dragIndex === index ? "opacity-50" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
-                    {group.avatar_url ? (
-                      <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <Users className="h-5 w-5 text-muted-foreground" />
-                    )}
+                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none">
+                    <GripVertical className="h-4 w-4" />
                   </div>
-                  <div>
-                    <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
-                    {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
-                  </div>
+                  <button onClick={() => navigate(`/groups/${group.id}`)} className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
+                      {group.avatar_url ? (
+                        <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Users className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
+                      {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
+                    </div>
+                  </button>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
                   <span className="text-[10px] text-muted-foreground">{group.member_count}/{group.max_members ?? 15} 👥</span>
                 </div>
               </div>
-            </button>
+            </div>
           ))
         )}
       </div>
