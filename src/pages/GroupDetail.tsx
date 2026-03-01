@@ -12,6 +12,7 @@ import { useGroupMembers } from "@/hooks/use-group-members";
 import { useGroupLists, useCreateGroupList, useDeleteGroupList } from "@/hooks/use-group-lists";
 import { useFriends } from "@/hooks/use-friends";
 import { useFlashbacks, useCreateFlashback, useUpdateFlashback, useFlashbackMedia, useUploadFlashbackMedia } from "@/hooks/use-flashbacks";
+import { createNotification } from "@/hooks/use-notifications";
 import { GroupListDetail } from "@/components/GroupListDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,7 +264,7 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
           <div className="max-w-lg mx-auto flex gap-2">
             <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
               <Camera className="h-4 w-4 text-muted-foreground" />
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
             </label>
             <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Nachricht..." className="h-10 rounded-xl bg-secondary border-0 text-sm text-foreground" />
             <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
@@ -807,6 +808,8 @@ function FlashbackTab({ groupId }: { groupId: string }) {
   const [unlockDate, setUnlockDate] = useState("");
   const [unlockTime, setUnlockTime] = useState("");
   const [activeFlashback, setActiveFlashback] = useState<any>(null);
+  const [allowPhotos, setAllowPhotos] = useState(true);
+  const [allowVideos, setAllowVideos] = useState(true);
   const { toast } = useToast();
 
   if (activeFlashback) {
@@ -826,8 +829,8 @@ function FlashbackTab({ groupId }: { groupId: string }) {
             <form onSubmit={(e) => {
               e.preventDefault();
               const unlockAt = new Date(`${unlockDate}T${unlockTime || "00:00"}`).toISOString();
-              createFlashback.mutate({ title, description: desc, unlock_at: unlockAt });
-              setTitle(""); setDesc(""); setUnlockDate(""); setUnlockTime(""); setShowCreate(false);
+              createFlashback.mutate({ title, description: desc, unlock_at: unlockAt, allow_photos: allowPhotos, allow_videos: allowVideos });
+              setTitle(""); setDesc(""); setUnlockDate(""); setUnlockTime(""); setAllowPhotos(true); setAllowVideos(true); setShowCreate(false);
               toast({ title: "Flashback erstellt! ✨" });
             }} className="space-y-4">
               <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titel" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
@@ -837,6 +840,17 @@ function FlashbackTab({ groupId }: { groupId: string }) {
                 <div className="flex gap-2 mt-1">
                   <Input value={unlockDate} onChange={e => setUnlockDate(e.target.value)} type="date" required className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
                   <Input value={unlockTime} onChange={e => setUnlockTime(e.target.value)} type="time" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Erlaubte Medien:</label>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-foreground">Fotos erlauben</span>
+                  <Switch checked={allowPhotos} onCheckedChange={setAllowPhotos} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-foreground">Videos erlauben</span>
+                  <Switch checked={allowVideos} onCheckedChange={setAllowVideos} />
                 </div>
               </div>
               <Button type="submit" className="w-full h-12 rounded-xl" disabled={!title.trim() || !unlockDate}>Erstellen</Button>
@@ -894,12 +908,23 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
 
   const isUnlocked = new Date(flashback.unlock_at) <= new Date();
   const isCreator = flashback.created_by === user?.id;
+  const fbAllowPhotos = (flashback as any).allow_photos !== false;
+  const fbAllowVideos = (flashback as any).allow_videos !== false;
+  const acceptTypes = [...(fbAllowPhotos ? ["image/*"] : []), ...(fbAllowVideos ? ["video/*"] : [])].join(",") || "image/*,video/*";
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     setUploading(true);
     for (const file of Array.from(files)) {
+      if (file.type.startsWith("image") && !fbAllowPhotos) {
+        toast({ title: "Fotos sind für diesen Flashback deaktiviert", variant: "destructive" });
+        continue;
+      }
+      if (file.type.startsWith("video") && !fbAllowVideos) {
+        toast({ title: "Videos sind für diesen Flashback deaktiviert", variant: "destructive" });
+        continue;
+      }
       await uploadMedia.mutateAsync(file);
     }
     setUploading(false);
@@ -937,10 +962,17 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
             </p>
             <label className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:bg-secondary/30 transition-colors">
               <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Fotos & Videos hochladen</span>
-              <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+              <span className="text-sm text-muted-foreground">{fbAllowPhotos && fbAllowVideos ? "Fotos & Videos hochladen" : fbAllowPhotos ? "Fotos hochladen" : "Videos hochladen"}</span>
+              <input type="file" accept={acceptTypes} multiple className="hidden" onChange={handleUpload} disabled={uploading} />
               {uploading && <div className="mt-2 h-4 w-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />}
             </label>
+            {fbAllowPhotos && (
+              <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
+                <Camera className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Kamera öffnen</span>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} disabled={uploading} />
+              </label>
+            )}
             <p className="text-[10px] text-muted-foreground text-center">{(media as any[]).length} Medien hochgeladen</p>
           </div>
         )}
@@ -970,8 +1002,15 @@ function FlashbackDetail({ flashback, onBack }: { flashback: any; onBack: () => 
                 <label className="flex items-center justify-center py-4 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
                   <Plus className="h-4 w-4 text-muted-foreground mr-1" />
                   <span className="text-xs text-muted-foreground">Mehr hochladen</span>
-                  <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+                  <input type="file" accept={acceptTypes} multiple className="hidden" onChange={handleUpload} disabled={uploading} />
                 </label>
+                {fbAllowPhotos && (
+                  <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:bg-secondary/30 transition-colors">
+                    <Camera className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Kamera</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} disabled={uploading} />
+                  </label>
+                )}
               </div>
             )}
           </>
@@ -1081,6 +1120,11 @@ function SettingsTab({ groupId, group, isAdmin }: { groupId: string; group: any;
     if (error) { toast({ title: "Fehler", description: error.message, variant: "destructive" }); return; }
     qc.invalidateQueries({ queryKey: ["group-members", groupId] });
     toast({ title: "Freund hinzugefügt! ✓" });
+    createNotification({
+      user_id: friendUserId, type: "group_added", title: "Zur Gruppe hinzugefügt 👥",
+      body: `Du wurdest zu "${group?.name}" hinzugefügt`,
+      from_user_id: user!.id, group_id: groupId, group_name: group?.name || "",
+    });
     setShowAddFriend(false);
   };
 

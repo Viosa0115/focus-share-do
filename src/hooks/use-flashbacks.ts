@@ -23,13 +23,15 @@ export function useCreateFlashback(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { title: string; description?: string; unlock_at: string }) => {
+    mutationFn: async (params: { title: string; description?: string; unlock_at: string; allow_photos?: boolean; allow_videos?: boolean }) => {
       const { error } = await supabase.from("group_flashbacks").insert({
         group_id: groupId!,
         created_by: user!.id,
         title: params.title,
         description: params.description || "",
         unlock_at: params.unlock_at,
+        allow_photos: params.allow_photos ?? true,
+        allow_videos: params.allow_videos ?? true,
       } as any);
       if (error) throw error;
     },

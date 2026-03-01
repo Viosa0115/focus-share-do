@@ -255,7 +255,7 @@ function DMChatTab({ friendshipId }: { friendshipId: string }) {
           {/* Snap button */}
           <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
             <Camera className="h-4 w-4 text-muted-foreground" />
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
           </label>
           <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Nachricht..." className="h-10 rounded-xl bg-secondary border-0 text-sm text-foreground" />
           {/* Regular image */}
