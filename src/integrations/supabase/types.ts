@@ -194,7 +194,22 @@ export type Database = {
           requester_id?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "friendships_addressee_profile_fkey"
+            columns: ["addressee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "friendships_requester_profile_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       group_events: {
         Row: {
@@ -314,6 +329,13 @@ export type Database = {
             referencedRelation: "groups"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_members_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       group_messages: {
@@ -345,6 +367,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -446,7 +475,7 @@ export type Database = {
           has_events?: boolean
           has_todos?: boolean
           id?: string
-          join_code: string
+          join_code?: string
           max_members?: number
           name: string
           owner_id: string
@@ -521,6 +550,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "todos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -610,6 +646,10 @@ export type Database = {
       generate_hashtag_code: { Args: never; Returns: string }
       generate_join_code: { Args: never; Returns: string }
       is_group_admin: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_group_member: {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }

@@ -24,10 +24,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const ensureProfile = async (authUser: User) => {
+      try {
+        const { data: existing, error: existingError } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("user_id", authUser.id)
+          .maybeSingle();
+
+        if (existingError) return;
+        if (existing) return;
+
+        const { data: generatedCode } = await supabase.rpc("generate_hashtag_code");
+        const hashtagCode =
+          typeof generatedCode === "string" && generatedCode.length > 0
+            ? generatedCode
+            : Math.random().toString(36).slice(2, 10);
+
+        const displayName =
+          authUser.user_metadata?.full_name ||
+          authUser.email?.split("@")[0] ||
+          `user_${authUser.id.slice(0, 6)}`;
+
+        await supabase.from("profiles").insert({
+          user_id: authUser.id,
+          display_name: displayName,
+          hashtag_code: hashtagCode,
+        });
+      } catch (err) {
+        console.error("Profil-Initialisierung fehlgeschlagen", err);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) void ensureProfile(session.user);
         setLoading(false);
       }
     );
@@ -35,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) void ensureProfile(session.user);
       setLoading(false);
     });
 

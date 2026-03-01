@@ -7,13 +7,34 @@ export function usePosts() {
   return useQuery({
     queryKey: ["posts", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const joined = await supabase
         .from("posts")
-        .select("*, profiles!posts_user_id_fkey(display_name, avatar_url, hashtag_code, is_private)")
+        .select("*, profiles:profiles!posts_user_profile_fkey(display_name, avatar_url, hashtag_code, is_private)")
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) throw error;
-      return data;
+
+      if (!joined.error) return joined.data;
+
+      const { data: posts, error: postsError } = await supabase
+        .from("posts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (postsError) throw postsError;
+      if (!posts?.length) return posts;
+
+      const userIds = Array.from(new Set(posts.map((p) => p.user_id)));
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url, hashtag_code, is_private")
+        .in("user_id", userIds);
+      if (profilesError) throw profilesError;
+
+      const byUserId = new Map((profiles ?? []).map((p: any) => [p.user_id, p]));
+      return posts.map((post: any) => ({
+        ...post,
+        profiles: byUserId.get(post.user_id) ?? null,
+      }));
     },
     enabled: !!user,
   });
