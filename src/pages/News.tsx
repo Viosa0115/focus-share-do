@@ -214,9 +214,13 @@ const News = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{item.title}</p>
-                      {item.from_user_name && <p className="text-[10px] text-primary mt-0.5">👤 {item.from_user_name}</p>}
+                      {item.from_user_name && (
+                        <p className="text-[10px] text-primary mt-0.5">👤 von {item.from_user_name}</p>
+                      )}
                       {item.body && <p className="text-xs text-muted-foreground mt-0.5">{item.body}</p>}
-                      {item.group_name && <p className="text-[10px] text-primary mt-0.5">📁 {item.group_name}</p>}
+                      {item.group_name && (
+                        <p className="text-[10px] text-primary mt-0.5">📁 {item.group_name}</p>
+                      )}
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {format(new Date(item.created_at), "dd. MMM, HH:mm", { locale: de })}
                       </p>

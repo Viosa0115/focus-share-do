@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserPlus, Check, X, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
+import { useAllChatStreaks } from "@/hooks/use-chat-streaks";
+import { StreakBadge } from "@/components/StreakBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -13,6 +15,7 @@ const Friends = () => {
   const navigate = useNavigate();
   const { data: friends = [] } = useFriends();
   const { data: requests = [] } = useFriendRequests();
+  const { data: allStreaks = [] } = useAllChatStreaks();
   const sendRequest = useSendFriendRequest();
   const respondRequest = useRespondFriendRequest();
   const [showAdd, setShowAdd] = useState(false);
@@ -141,6 +144,10 @@ const Friends = () => {
                     <p className="text-sm font-medium text-foreground">{profile?.display_name || "Unbekannt"}</p>
                     <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
                   </button>
+                  {(() => {
+                    const streak = (allStreaks as any[]).find((s: any) => s.friendship_id === f.id);
+                    return streak?.current_streak > 0 ? <StreakBadge streak={streak.current_streak} size="sm" /> : null;
+                  })()}
                   <button onClick={() => navigate(`/friends/${f.id}`)} className="text-muted-foreground hover:text-foreground transition-colors">
                     <MessageCircle className="h-4 w-4" />
                   </button>

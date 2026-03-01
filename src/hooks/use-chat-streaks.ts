@@ -2,6 +2,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 
+export function useAllChatStreaks() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["all-chat-streaks", user?.id],
+    queryFn: async () => {
+      // Get all friendship IDs for user
+      const { data: friendships } = await supabase
+        .from("friendships")
+        .select("id")
+        .or(`requester_id.eq.${user!.id},addressee_id.eq.${user!.id}`)
+        .eq("status", "accepted");
+      if (!friendships?.length) return [];
+      const ids = friendships.map(f => f.id);
+      const { data, error } = await supabase
+        .from("chat_streaks")
+        .select("*")
+        .in("friendship_id", ids);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+}
+
 export function useChatStreak(friendshipId: string | undefined) {
   return useQuery({
     queryKey: ["chat-streak", friendshipId],
