@@ -62,6 +62,9 @@ const FriendProfile = () => {
           </div>
           <div className="text-center space-y-1">
             <h2 className="text-xl font-semibold text-foreground">{profile?.display_name || "Unbekannt"}</h2>
+            {(profile as any)?.aura !== undefined && (
+              <p className="text-sm font-bold text-primary">✨ {(profile as any)?.aura || 0} Aura</p>
+            )}
             {profile?.hashtag_code && (
               <p className="text-xs text-muted-foreground font-mono">#{profile.hashtag_code}</p>
             )}

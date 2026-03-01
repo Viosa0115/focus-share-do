@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus, Check, X, Users as UsersIcon, MessageCircle } from "lucide-react";
+import { UserPlus, Check, X, Users as UsersIcon, MessageCircle, Share2, BookUser } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
 import { useAllChatStreaks } from "@/hooks/use-chat-streaks";
 import { useFriendLastMessages, useUnreadDMCountPerFriend } from "@/hooks/use-friend-last-messages";
@@ -8,6 +8,7 @@ import { StreakBadge } from "@/components/StreakBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useProfile } from "@/hooks/use-profile";
 import { useToast } from "@/hooks/use-toast";
 import BottomNav from "@/components/BottomNav";
 import { format, isToday, isYesterday } from "date-fns";
@@ -23,6 +24,18 @@ const Friends = () => {
   const respondRequest = useRespondFriendRequest();
   const [showAdd, setShowAdd] = useState(false);
   const [hashtag, setHashtag] = useState("");
+  const { data: profile } = useProfile();
+
+  const handleShareInvite = async () => {
+    const code = profile?.hashtag_code || "";
+    const text = `Hey! Lade dir die life. App herunter und füge mich als Freund hinzu mit dem Code: #${code}\nhttps://focus-share-do.lovable.app`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "life. App", text }); } catch {}
+    } else {
+      navigator.clipboard.writeText(text);
+      toast({ title: "Einladungslink kopiert! 📋" });
+    }
+  };
 
   const acceptedFriends = (friends as any[]).filter((f: any) => f.status === "accepted");
   const friendshipIds = acceptedFriends.map((f: any) => f.id);
@@ -85,6 +98,12 @@ const Friends = () => {
                 >
                   {sendRequest.isPending ? "Sendet..." : "Anfrage senden"}
                 </Button>
+                <div className="border-t border-border pt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground text-center">Oder lade Freunde ein</p>
+                  <Button type="button" variant="outline" className="w-full h-10 rounded-xl text-xs" onClick={handleShareInvite}>
+                    <Share2 className="h-4 w-4 mr-1" /> Link teilen / Einladen
+                  </Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>

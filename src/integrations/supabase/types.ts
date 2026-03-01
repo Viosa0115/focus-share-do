@@ -1304,6 +1304,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aura: number
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -1320,6 +1321,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          aura?: number
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1336,6 +1338,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          aura?: number
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1381,6 +1384,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "respect_points_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_posts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_posts_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
