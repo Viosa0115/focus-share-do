@@ -62,7 +62,7 @@ const GroupDetail = () => {
     { key: "todos", label: "Aufgaben", icon: CheckSquare, show: group?.has_todos ?? true },
     { key: "challenges", label: "Challenges", icon: Trophy, show: group?.has_challenges ?? false },
     { key: "events", label: "Events", icon: Calendar, show: group?.has_events ?? false },
-    { key: "settings", label: "Settings", icon: Settings, show: isAdmin },
+    { key: "settings", label: "Settings", icon: Settings, show: true },
   ];
 
   const [activeTab, setActiveTab] = useState<TabKey>("chat");
@@ -731,11 +731,16 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { data: members = [] } = useGroupMembers(groupId);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const isOwner = group?.owner_id === user?.id;
+  const myMember = members.find((m: any) => m.user_id === user?.id);
+  const isSettingsAdmin = myMember?.role === "admin";
 
   const startEdit = () => {
     setEditName(group?.name || "");
@@ -780,9 +785,28 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
     qc.invalidateQueries({ queryKey: ["group-members", groupId] });
   };
 
+  const leaveGroup = async () => {
+    if (!confirm("Möchtest du die Gruppe wirklich verlassen?")) return;
+    const { error } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", user!.id);
+    if (error) { toast({ title: "Fehler", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Gruppe verlassen" });
+    navigate("/groups");
+  };
+
+  const deleteGroup = async () => {
+    if (!confirm("Möchtest du die Gruppe wirklich löschen? Das kann nicht rückgängig gemacht werden.")) return;
+    // Delete members, then group
+    await supabase.from("group_members").delete().eq("group_id", groupId);
+    const { error } = await supabase.from("groups").delete().eq("id", groupId);
+    if (error) { toast({ title: "Fehler", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Gruppe gelöscht" });
+    navigate("/groups");
+  };
+
   return (
     <div className="overflow-y-auto h-full px-4 py-4 space-y-6">
-      {/* Group Info */}
+      {/* Group Info - admin only */}
+      {isSettingsAdmin && (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-foreground">Gruppeninfo</h3>
         <div className="flex items-center gap-4">
@@ -816,15 +840,17 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Members & Permissions */}
+      {/* Members & Permissions - admin only */}
+      {isSettingsAdmin && (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-foreground">Mitglieder & Berechtigungen</h3>
         <div className="space-y-3">
           {members.map((member: any) => {
             const isCurrentUser = member.user_id === user?.id;
             const memberName = member.profiles?.display_name || "Nutzer";
-            const isAdmin = member.role === "admin";
+            const memberIsAdmin = member.role === "admin";
 
             return (
               <div key={member.id} className="p-3 rounded-xl bg-card shadow-soft space-y-2">
@@ -836,7 +862,7 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
                     <div>
                       <p className="text-sm font-medium text-foreground">{memberName}</p>
                       <div className="flex items-center gap-1">
-                        {isAdmin ? (
+                        {memberIsAdmin ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-0.5">
                             <ShieldCheck className="h-2.5 w-2.5" /> Admin
                           </span>
@@ -846,13 +872,13 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
                       </div>
                     </div>
                   </div>
-                  {!isCurrentUser && !isAdmin && (
+                  {!isCurrentUser && !memberIsAdmin && (
                     <Button size="sm" variant="outline" className="rounded-xl text-xs h-7"
                       onClick={() => updateMemberRole(member.id, "admin")}>
                       <Shield className="h-3 w-3 mr-1" /> Admin
                     </Button>
                   )}
-                  {!isCurrentUser && isAdmin && member.user_id !== group?.owner_id && (
+                  {!isCurrentUser && memberIsAdmin && member.user_id !== group?.owner_id && (
                     <Button size="sm" variant="outline" className="rounded-xl text-xs h-7"
                       onClick={() => updateMemberRole(member.id, "member")}>
                       Admin entfernen
@@ -860,8 +886,7 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
                   )}
                 </div>
 
-                {/* Permissions - only show for non-admin members */}
-                {!isAdmin && !isCurrentUser && (
+                {!memberIsAdmin && !isCurrentUser && (
                   <div className="space-y-1.5 pt-2 border-t border-border">
                     {[
                       { key: "can_chat", label: "Chat" },
@@ -883,6 +908,20 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
             );
           })}
         </div>
+      </div>
+      )}
+
+      {/* Danger zone */}
+      <div className="space-y-3 pt-4 border-t border-border">
+        <h3 className="text-sm font-semibold text-destructive">Gefahrenzone</h3>
+        <Button variant="outline" className="w-full rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10" onClick={leaveGroup}>
+          Gruppe verlassen
+        </Button>
+        {isOwner && (
+          <Button variant="destructive" className="w-full rounded-xl" onClick={deleteGroup}>
+            Gruppe löschen
+          </Button>
+        )}
       </div>
     </div>
   );

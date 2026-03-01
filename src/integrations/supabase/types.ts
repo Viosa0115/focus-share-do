@@ -495,6 +495,106 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_challenges: {
+        Row: {
+          best_time_ms: number | null
+          challenge_type: string
+          created_at: string
+          ended_at: string | null
+          given_up: boolean
+          id: string
+          name: string
+          score: number
+          started_at: string | null
+          user_id: string
+        }
+        Insert: {
+          best_time_ms?: number | null
+          challenge_type: string
+          created_at?: string
+          ended_at?: string | null
+          given_up?: boolean
+          id?: string
+          name: string
+          score?: number
+          started_at?: string | null
+          user_id: string
+        }
+        Update: {
+          best_time_ms?: number | null
+          challenge_type?: string
+          created_at?: string
+          ended_at?: string | null
+          given_up?: boolean
+          id?: string
+          name?: string
+          score?: number
+          started_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      post_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           content: string
@@ -596,6 +696,65 @@ export type Database = {
         }
         Relationships: []
       }
+      respect_points: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          given_at: string
+          id: string
+          post_id: string
+          to_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          given_at?: string
+          id?: string
+          post_id: string
+          to_user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          given_at?: string
+          id?: string
+          post_id?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respect_points_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      todo_labels: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       todos: {
         Row: {
           completed: boolean
@@ -604,6 +763,7 @@ export type Database = {
           due_date: string | null
           due_time: string | null
           id: string
+          label_id: string | null
           pinned: boolean
           recurrence: string | null
           title: string
@@ -617,6 +777,7 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           id?: string
+          label_id?: string | null
           pinned?: boolean
           recurrence?: string | null
           title: string
@@ -630,13 +791,22 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           id?: string
+          label_id?: string | null
           pinned?: boolean
           recurrence?: string | null
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "todos_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "todo_labels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
