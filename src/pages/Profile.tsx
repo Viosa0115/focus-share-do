@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
@@ -276,6 +276,33 @@ const Profile = () => {
         <div className="p-4 rounded-2xl bg-card shadow-soft">
           <p className="text-xs text-muted-foreground">E-Mail</p>
           <p className="text-sm text-foreground mt-1">{user?.email}</p>
+        </div>
+
+        {/* Delete Account */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3 border border-destructive/20">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <p className="text-sm font-medium text-destructive">Konto löschen</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Dein Konto und alle zugehörigen Daten werden unwiderruflich gelöscht.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full rounded-xl"
+            onClick={async () => {
+              if (!confirm("Bist du sicher? Dein Konto und alle Daten werden unwiderruflich gelöscht.")) return;
+              if (!confirm("Letzte Warnung: Diese Aktion kann NICHT rückgängig gemacht werden. Fortfahren?")) return;
+              // Delete profile data first, then sign out
+              await supabase.from("todos").delete().eq("user_id", user!.id);
+              await supabase.from("posts").delete().eq("user_id", user!.id);
+              await supabase.from("profiles").delete().eq("user_id", user!.id);
+              await signOut();
+              toast({ title: "Konto gelöscht. Auf Wiedersehen 👋" });
+            }}
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Konto unwiderruflich löschen
+          </Button>
         </div>
       </div>
 

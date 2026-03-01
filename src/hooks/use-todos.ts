@@ -25,17 +25,21 @@ export function useCreateTodo() {
   return useMutation({
     mutationFn: async (payload: {
       title: string;
+      description?: string;
       due_date?: string;
       due_time?: string;
       recurrence?: string;
+      label_id?: string;
     }) => {
       const { error } = await supabase
         .from("todos")
         .insert({
           title: payload.title,
+          description: payload.description || null,
           user_id: user!.id,
           due_date: payload.due_date || null,
           recurrence: payload.recurrence || null,
+          label_id: payload.label_id || null,
         });
       if (error) throw error;
     },

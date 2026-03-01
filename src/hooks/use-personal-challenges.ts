@@ -1,0 +1,59 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
+
+export function usePersonalChallenges() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["personal-challenges", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("personal_challenges")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useCreatePersonalChallenge() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ name, challenge_type }: { name: string; challenge_type: string }) => {
+      const { error } = await supabase
+        .from("personal_challenges")
+        .insert({ user_id: user!.id, name, challenge_type });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["personal-challenges"] }),
+  });
+}
+
+export function useUpdatePersonalChallenge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, any> }) => {
+      const { error } = await supabase
+        .from("personal_challenges")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["personal-challenges"] }),
+  });
+}
+
+export function useDeletePersonalChallenge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("personal_challenges").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["personal-challenges"] }),
+  });
+}
