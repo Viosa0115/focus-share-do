@@ -55,7 +55,7 @@ export function useCreatePost() {
       const { error } = await supabase.from("posts").insert({
         user_id: user!.id,
         ...payload,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
@@ -68,6 +68,21 @@ export function useDeletePost() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("posts").delete().eq("id", id);
       if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
+  });
+}
+
+export function useExtendPostLife() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ postId, extraMs }: { postId: string; extraMs: number }) => {
+      // Get current expires_at
+      const { data: post } = await supabase.from("posts").select("expires_at").eq("id", postId).single();
+      if (!post) return;
+      const currentExpiry = post.expires_at ? new Date(post.expires_at) : new Date(Date.now() + 48 * 3600000);
+      const newExpiry = new Date(currentExpiry.getTime() + extraMs);
+      await supabase.from("posts").update({ expires_at: newExpiry.toISOString() } as any).eq("id", postId);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
   });

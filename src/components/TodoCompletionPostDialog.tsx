@@ -63,13 +63,18 @@ export function TodoCompletionPostDialog({ open, onClose, todoId, groupTodoId, g
       setUploading(false);
     }
 
-    // Build content with streak and description
-    let defaultContent = `✅ ${todoTitle} erledigt!`;
-    if (todoDescription) defaultContent += `\n📝 ${todoDescription}`;
-    if (streakCount && streakCount > 0) defaultContent += `\n🔥 Streak: ${streakCount}`;
+    // Build structured content: metadata above separator, user text below
+    let metaParts: string[] = [];
+    metaParts.push(`✅ ${todoTitle}`);
+    if (todoDescription) metaParts.push(`📝 ${todoDescription}`);
+    if (streakCount && streakCount > 0) metaParts.push(`🔥 Streak: ${streakCount}`);
+    
+    const separator = "———";
+    const userContent = content.trim() || "Geschafft! 💪";
+    const fullContent = metaParts.join("\n") + "\n" + separator + "\n" + userContent;
 
     await createPost.mutateAsync({
-      content: content || defaultContent,
+      content: fullContent,
       image_url,
       todo_id: todoId || null,
       group_todo_id: groupTodoId || null,

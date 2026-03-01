@@ -23,10 +23,11 @@ export function useCreateChallenge(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { name: string; challenge_type: "count" | "time" | "endurance"; start_date: string; duration_days: number }) => {
+    mutationFn: async (params: { name: string; challenge_type: "count" | "time" | "endurance"; start_date: string; duration_days: number; reset_interval?: string }) => {
+      const { reset_interval, ...rest } = params;
       const { data: createdChallenge, error } = await supabase
         .from("challenges")
-        .insert({ ...params, group_id: groupId!, created_by: user!.id })
+        .insert({ ...rest, group_id: groupId!, created_by: user!.id, ...(reset_interval ? { reset_interval } : {}) } as any)
         .select("id, name")
         .single();
       if (error) throw error;
@@ -71,6 +72,34 @@ export function useJoinChallenge(groupId: string | undefined) {
         .from("challenge_participants")
         .insert({ challenge_id: challengeId, user_id: user!.id });
       if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["challenges", groupId] }),
+  });
+}
+
+export function useAcceptEndurance(groupId: string | undefined) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (challengeId: string) => {
+      const { data: ch } = await supabase.from("challenges").select("accepted_by, declined_by").eq("id", challengeId).single();
+      const accepted = [...(ch?.accepted_by as string[] || []), user!.id];
+      await supabase.from("challenges").update({ accepted_by: accepted } as any).eq("id", challengeId);
+      // Also join as participant
+      await supabase.from("challenge_participants").upsert({ challenge_id: challengeId, user_id: user!.id, started_at: null } as any, { onConflict: "challenge_id,user_id" });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["challenges", groupId] }),
+  });
+}
+
+export function useDeclineEndurance(groupId: string | undefined) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (challengeId: string) => {
+      const { data: ch } = await supabase.from("challenges").select("declined_by").eq("id", challengeId).single();
+      const declined = [...(ch?.declined_by as string[] || []), user!.id];
+      await supabase.from("challenges").update({ declined_by: declined } as any).eq("id", challengeId);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["challenges", groupId] }),
   });

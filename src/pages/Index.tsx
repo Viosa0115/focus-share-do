@@ -48,6 +48,8 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <BottomNav />
     </div>
   );
 };
