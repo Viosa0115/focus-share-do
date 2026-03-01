@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { addAuraPoints } from "@/hooks/use-aura";
 
 export function usePosts() {
   const { user } = useAuth();
@@ -57,6 +58,9 @@ export function useCreatePost() {
         ...payload,
       } as any);
       if (error) throw error;
+      if (payload.todo_id || payload.group_todo_id) {
+        addAuraPoints(user!.id, 2);
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["posts"] }),
   });

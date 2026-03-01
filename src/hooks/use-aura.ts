@@ -37,23 +37,25 @@ export function useAuraRanking() {
   });
 }
 
+export async function addAuraPoints(userId: string, points: number) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("aura")
+    .eq("user_id", userId)
+    .single();
+  const currentAura = (profile as any)?.aura ?? 0;
+  await supabase
+    .from("profiles")
+    .update({ aura: currentAura + points } as any)
+    .eq("user_id", userId);
+}
+
 export function useAddAura() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (points: number) => {
-      // Get current aura
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("aura")
-        .eq("user_id", user!.id)
-        .single();
-      const currentAura = (profile as any)?.aura ?? 0;
-      const { error } = await supabase
-        .from("profiles")
-        .update({ aura: currentAura + points } as any)
-        .eq("user_id", user!.id);
-      if (error) throw error;
+      await addAuraPoints(user!.id, points);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["aura"] });

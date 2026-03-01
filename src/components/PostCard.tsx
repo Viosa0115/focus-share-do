@@ -7,7 +7,7 @@ import { useCommentReplies, useAddReply } from "@/hooks/use-comment-replies";
 import { createNotification } from "@/hooks/use-notifications";
 import { useExtendPostLife } from "@/hooks/use-posts";
 import { useToggleSavePost, useMySavedPostIds } from "@/hooks/use-saved-posts";
-import { useAddAura } from "@/hooks/use-aura";
+import { addAuraPoints } from "@/hooks/use-aura";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -117,6 +117,7 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
     toggleLike.mutate({ postId: post.id, liked: myLike });
     if (!myLike) {
       extendLife.mutate({ postId: post.id, extraMs: 3600000 });
+      if (user) addAuraPoints(user.id, 1);
       if (post.user_id !== user?.id) {
         createNotification({
           user_id: post.user_id, type: "like", title: "Neuer Like ❤️",
@@ -132,6 +133,7 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
     e.preventDefault();
     if (!commentText.trim()) return;
     addComment.mutate({ postId: post.id, content: commentText.trim() });
+    if (user) addAuraPoints(user.id, 10);
     if (post.user_id !== user?.id) {
       createNotification({
         user_id: post.user_id, type: "comment", title: "Neuer Kommentar 💬",
@@ -148,6 +150,7 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
     if (post.user_id === user?.id) { toast({ title: "Du kannst dir nicht selbst Respect geben", variant: "destructive" }); return; }
     giveRespect.mutate({ postId: post.id, toUserId: post.user_id });
     extendLife.mutate({ postId: post.id, extraMs: 48 * 3600000 });
+    if (user) addAuraPoints(user.id, 25);
     createNotification({
       user_id: post.user_id, type: "respect", title: "Respect erhalten! 🫡",
       body: `${myDisplayName} hat dir Respect gegeben`,

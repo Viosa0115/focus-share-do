@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect } from "react";
+import { addAuraPoints } from "@/hooks/use-aura";
 
 export function useGroupMessages(groupId: string | undefined) {
   const { user } = useAuth();
@@ -54,6 +55,7 @@ export function useSendMessage(groupId: string | undefined) {
         .from("group_messages")
         .insert({ group_id: groupId!, user_id: user!.id, content });
       if (error) throw error;
+      addAuraPoints(user!.id, 1);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["group-messages", groupId] }),
   });
