@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles } from "lucide-react";
+import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles, Search, Crown } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -121,6 +121,8 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [viewSnap, setViewSnap] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { data: members = [] } = useGroupMembers(groupId);
   const { toast } = useToast();
@@ -192,8 +194,22 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
     return false;
   };
 
+  const filteredMessages = searchQuery
+    ? (messages as any[]).filter((m: any) => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages;
+
   return (
     <div className="flex flex-col h-full">
+      {/* Search bar */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50">
+        <button onClick={() => setShowSearch(!showSearch)} className="text-muted-foreground hover:text-foreground">
+          <Search className="h-4 w-4" />
+        </button>
+        {showSearch && (
+          <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Suchen..."
+            className="h-8 rounded-lg bg-secondary border-0 text-xs text-foreground flex-1" autoFocus />
+        )}
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
@@ -201,10 +217,12 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
               <div className="h-full w-1/2 bg-foreground/20 rounded-full animate-pulse" />
             </div>
           </div>
-        ) : messages.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-16">Noch keine Nachrichten. Starte die Konversation! 💬</p>
+        ) : (filteredMessages as any[]).length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground py-16">
+            {searchQuery ? "Keine Treffer" : "Noch keine Nachrichten. Starte die Konversation! 💬"}
+          </p>
         ) : (
-          messages.map((msg: any) => {
+          (filteredMessages as any[]).map((msg: any) => {
             const isOwn = msg.user_id === user?.id;
             const hasImage = !!msg.image_url;
             const isSnap = msg.is_snap;
@@ -1418,6 +1436,31 @@ function SettingsTab({ groupId, group, isAdmin }: { groupId: string; group: any;
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Feature Toggles */}
+      {isSettingsAdmin && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">Features aktivieren/deaktivieren</h3>
+          <div className="space-y-2">
+            {[
+              { key: "has_todos", label: "Aufgaben" },
+              { key: "has_challenges", label: "Challenges" },
+              { key: "has_events", label: "Events" },
+              { key: "has_flashbacks", label: "Flashbacks" },
+              { key: "auto_delete_messages", label: "Selbstlöschende Nachrichten (24h)" },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-card shadow-soft">
+                <span className="text-xs text-foreground">{label}</span>
+                <Switch checked={(group as any)?.[key] ?? false} onCheckedChange={async (val) => {
+                  await supabase.from("groups").update({ [key]: val } as any).eq("id", groupId);
+                  qc.invalidateQueries({ queryKey: ["group", groupId] });
+                  toast({ title: `${label} ${val ? "aktiviert" : "deaktiviert"} ✓` });
+                }} />
+              </div>
+            ))}
           </div>
         </div>
       )}
