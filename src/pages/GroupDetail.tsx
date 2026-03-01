@@ -79,6 +79,11 @@ const GroupDetail = () => {
             <button onClick={() => navigate("/groups")} className="text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </button>
+            {group?.avatar_url ? (
+              <div className="h-8 w-8 rounded-xl bg-secondary overflow-hidden flex-shrink-0">
+                <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
+              </div>
+            ) : null}
             <div className="flex-1 min-w-0">
               <h1 className="font-semibold text-foreground truncate">{group?.name || "..."}</h1>
               {group?.description && <p className="text-xs text-muted-foreground truncate">{group.description}</p>}

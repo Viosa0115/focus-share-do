@@ -37,7 +37,7 @@ const Groups = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("group_members")
-        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, max_members, created_at)")
+        .select("group_id, role, groups(id, name, description, join_code, owner_id, has_todos, has_challenges, has_events, max_members, created_at, avatar_url)")
         .eq("user_id", user!.id);
       if (error) throw error;
 
@@ -260,8 +260,12 @@ const Groups = () => {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center">
-                    <Users className="h-5 w-5 text-muted-foreground" />
+                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
+                    {group.avatar_url ? (
+                      <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    )}
                   </div>
                   <div>
                     <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
