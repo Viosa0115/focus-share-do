@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles, Search, Crown, Pin, BarChart3, Image as ImageIcon } from "lucide-react";
+import { markGroupAsSeen } from "@/hooks/use-unread-counts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -54,6 +55,11 @@ const GroupDetail = () => {
   });
 
   const isAdmin = myMembership?.role === "admin";
+
+  // Mark group messages as seen when opening group
+  useEffect(() => {
+    if (id && user) markGroupAsSeen(user.id, id);
+  }, [id, user]);
 
   const tabs: { key: TabKey; label: string; icon: any; show: boolean }[] = [
     { key: "chat", label: "Chat", icon: MessageCircle, show: true },

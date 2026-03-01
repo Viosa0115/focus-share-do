@@ -10,7 +10,75 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useJoinRequests, useRespondJoinRequest, useCreateJoinRequest } from "@/hooks/use-join-requests";
+import { useUnreadGroupCountPerGroup } from "@/hooks/use-unread-counts";
+import { addAuraPoints } from "@/hooks/use-aura";
 import BottomNav from "@/components/BottomNav";
+
+function GroupsList({ groups, isLoading, navigate, dragIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop, setDragIndex, setDragOverIndex }: any) {
+  const { user } = useAuth();
+  const groupIds = (groups as any[]).map((g: any) => g.id);
+  const { data: unreadPerGroup = {} } = useUnreadGroupCountPerGroup(groupIds);
+
+  if (isLoading) return <>{[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}</>;
+  if (groups.length === 0) return (
+    <div className="text-center py-16 space-y-2">
+      <Users className="h-10 w-10 mx-auto text-muted-foreground/50" />
+      <p className="text-sm text-muted-foreground">Noch keine Gruppen</p>
+      <p className="text-xs text-muted-foreground">Erstelle eine Gruppe oder tritt einer bei</p>
+    </div>
+  );
+
+  return (
+    <>
+      {groups.map((group: any, index: number) => {
+        const unread = (unreadPerGroup as any)[group.id] || 0;
+        return (
+          <div
+            key={group.id}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e: React.DragEvent) => handleDragOver(e, index)}
+            onDrop={() => handleDrop(index)}
+            onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+            className={`w-full text-left p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card ${
+              dragOverIndex === index ? "border-2 border-primary" : ""
+            } ${dragIndex === index ? "opacity-50" : ""}`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none">
+                  <GripVertical className="h-4 w-4" />
+                </div>
+                <button onClick={() => navigate(`/groups/${group.id}`)} className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
+                    {group.avatar_url ? (
+                      <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
+                    {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
+                  </div>
+                </button>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                {unread > 0 && (
+                  <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+                <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
+                <span className="text-[10px] text-muted-foreground">{group.member_count}/{group.max_members ?? 15} 👥</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 const Groups = () => {
   const { user } = useAuth();
@@ -117,6 +185,7 @@ const Groups = () => {
       return data;
     },
     onSuccess: (data) => {
+      if (user) addAuraPoints(user.id, 3);
       qc.invalidateQueries({ queryKey: ["groups"] });
       setShowCreate(false);
       setName("");
@@ -278,54 +347,10 @@ const Groups = () => {
       </div>
 
       <div className="max-w-lg mx-auto px-5 py-6 space-y-3">
-        {isLoading ? (
-          [1, 2, 3].map((i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)
-        ) : groups.length === 0 ? (
-          <div className="text-center py-16 space-y-2">
-            <Users className="h-10 w-10 mx-auto text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Noch keine Gruppen</p>
-            <p className="text-xs text-muted-foreground">Erstelle eine Gruppe oder tritt einer bei</p>
-          </div>
-        ) : (
-          groups.map((group: any, index: number) => (
-            <div
-              key={group.id}
-              draggable
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDrop={() => handleDrop(index)}
-              onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
-              className={`w-full text-left p-4 rounded-2xl bg-card shadow-soft space-y-2 transition-all duration-200 hover:shadow-card ${
-                dragOverIndex === index ? "border-2 border-primary" : ""
-              } ${dragIndex === index ? "opacity-50" : ""}`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-                  <button onClick={() => navigate(`/groups/${group.id}`)} className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
-                      {group.avatar_url ? (
-                        <img src={group.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-medium text-sm text-foreground">{group.name}</h3>
-                      {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
-                    </div>
-                  </button>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] text-muted-foreground font-mono">{group.join_code}</span>
-                  <span className="text-[10px] text-muted-foreground">{group.member_count}/{group.max_members ?? 15} 👥</span>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
+        <GroupsList groups={groups} isLoading={isLoading} navigate={navigate} 
+          dragIndex={dragIndex} dragOverIndex={dragOverIndex}
+          handleDragStart={handleDragStart} handleDragOver={handleDragOver} handleDrop={handleDrop}
+          setDragIndex={setDragIndex} setDragOverIndex={setDragOverIndex} />
       </div>
 
       <BottomNav />

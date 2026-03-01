@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { addAuraPoints } from "@/hooks/use-aura";
 
 const PROFILE_FIELDS = "user_id, display_name, avatar_url, hashtag_code";
 
@@ -125,6 +126,7 @@ export function useSendFriendRequest() {
 }
 
 export function useRespondFriendRequest() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
@@ -133,6 +135,9 @@ export function useRespondFriendRequest() {
         .update({ status: accept ? "accepted" : "rejected" })
         .eq("id", id);
       if (error) throw error;
+      if (accept && user) {
+        addAuraPoints(user.id, 15);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["friends"] });

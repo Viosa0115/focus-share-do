@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useTheme } from "@/lib/theme-context";
-import { useAura, useAuraRanking } from "@/hooks/use-aura";
+import { useAura, useAuraRanking, addAuraPoints } from "@/hooks/use-aura";
 import { useSavedPosts } from "@/hooks/use-saved-posts";
 import { usePosts, useDeletePost } from "@/hooks/use-posts";
 import { useAllPostLikes, useRespectPoints, useAllRespectForPosts } from "@/hooks/use-post-interactions";
@@ -72,8 +72,15 @@ const Profile = () => {
   };
 
   const saveSocial = async () => {
+    // Count newly added social links for aura
+    const oldLinks = { instagram: (profile as any)?.instagram || "", tiktok: (profile as any)?.tiktok || "", pinterest: (profile as any)?.pinterest || "", spotify: (profile as any)?.spotify || "", snapchat: (profile as any)?.snapchat || "" };
+    let newLinkCount = 0;
+    for (const key of Object.keys(socialLinks) as (keyof typeof socialLinks)[]) {
+      if (socialLinks[key] && !oldLinks[key]) newLinkCount++;
+    }
     const { error } = await supabase.from("profiles").update(socialLinks as any).eq("user_id", user!.id);
     if (error) { toast({ title: "Fehler", description: error.message, variant: "destructive" }); return; }
+    if (newLinkCount > 0 && user) addAuraPoints(user.id, newLinkCount * 10);
     qc.invalidateQueries({ queryKey: ["profile"] }); setEditingSocial(false);
     toast({ title: "Social Links gespeichert ✓" });
   };
