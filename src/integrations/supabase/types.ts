@@ -199,21 +199,33 @@ export type Database = {
           created_at: string
           friendship_id: string
           id: string
+          image_url: string | null
+          is_snap: boolean
+          saved_by: string[] | null
           sender_id: string
+          viewed_by: string[] | null
         }
         Insert: {
           content: string
           created_at?: string
           friendship_id: string
           id?: string
+          image_url?: string | null
+          is_snap?: boolean
+          saved_by?: string[] | null
           sender_id: string
+          viewed_by?: string[] | null
         }
         Update: {
           content?: string
           created_at?: string
           friendship_id?: string
           id?: string
+          image_url?: string | null
+          is_snap?: boolean
+          saved_by?: string[] | null
           sender_id?: string
+          viewed_by?: string[] | null
         }
         Relationships: [
           {
@@ -301,6 +313,41 @@ export type Database = {
           },
         ]
       }
+      flashback_media: {
+        Row: {
+          created_at: string
+          flashback_id: string
+          id: string
+          media_type: string
+          media_url: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          flashback_id: string
+          id?: string
+          media_type?: string
+          media_url: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          flashback_id?: string
+          id?: string
+          media_type?: string
+          media_url?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flashback_media_flashback_id_fkey"
+            columns: ["flashback_id"]
+            isOneToOne: false
+            referencedRelation: "group_flashbacks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       friendships: {
         Row: {
           addressee_id: string
@@ -377,6 +424,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "group_events_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_flashbacks: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          group_id: string
+          id: string
+          title: string
+          unlock_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          group_id: string
+          id?: string
+          title: string
+          unlock_at: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          group_id?: string
+          id?: string
+          title?: string
+          unlock_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_flashbacks_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
@@ -546,21 +631,33 @@ export type Database = {
           created_at: string
           group_id: string
           id: string
+          image_url: string | null
+          is_snap: boolean
+          saved_by: string[] | null
           user_id: string
+          viewed_by: string[] | null
         }
         Insert: {
           content: string
           created_at?: string
           group_id: string
           id?: string
+          image_url?: string | null
+          is_snap?: boolean
+          saved_by?: string[] | null
           user_id: string
+          viewed_by?: string[] | null
         }
         Update: {
           content?: string
           created_at?: string
           group_id?: string
           id?: string
+          image_url?: string | null
+          is_snap?: boolean
+          saved_by?: string[] | null
           user_id?: string
+          viewed_by?: string[] | null
         }
         Relationships: [
           {
@@ -662,6 +759,7 @@ export type Database = {
           description: string | null
           has_challenges: boolean
           has_events: boolean
+          has_flashbacks: boolean
           has_todos: boolean
           id: string
           join_code: string
@@ -676,6 +774,7 @@ export type Database = {
           description?: string | null
           has_challenges?: boolean
           has_events?: boolean
+          has_flashbacks?: boolean
           has_todos?: boolean
           id?: string
           join_code?: string
@@ -690,6 +789,7 @@ export type Database = {
           description?: string | null
           has_challenges?: boolean
           has_events?: boolean
+          has_flashbacks?: boolean
           has_todos?: boolean
           id?: string
           join_code?: string
