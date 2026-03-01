@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Award, Send, Trash2, Reply } from "lucide-react";
+import { Heart, MessageCircle, Award, Send, Trash2, Reply, Bookmark } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useToggleLike, usePostComments, useAddComment, useGiveRespect } from "@/hooks/use-post-interactions";
 import { useCommentReplies, useAddReply } from "@/hooks/use-comment-replies";
 import { createNotification } from "@/hooks/use-notifications";
 import { useExtendPostLife } from "@/hooks/use-posts";
+import { useToggleSavePost, useMySavedPostIds } from "@/hooks/use-saved-posts";
+import { useAddAura } from "@/hooks/use-aura";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -84,6 +86,9 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
   const toggleLike = useToggleLike();
   const giveRespect = useGiveRespect();
   const extendLife = useExtendPostLife();
+  const toggleSave = useToggleSavePost();
+  const { data: savedIds } = useMySavedPostIds();
+  const isSaved = savedIds?.has(post.id) ?? false;
   const [showComments, setShowComments] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
   const { data: comments = [] } = usePostComments(post.id);
@@ -201,6 +206,10 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
           disabled={hasGivenRespectToday || post.user_id === user?.id}>
           <Award className="h-4 w-4" />
           {respectCount > 0 && <span>{respectCount}</span>}
+        </button>
+        <button onClick={() => toggleSave.mutate({ postId: post.id, saved: isSaved })}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors ml-auto ${isSaved ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-secondary"}`}>
+          <Bookmark className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
         </button>
       </div>
 

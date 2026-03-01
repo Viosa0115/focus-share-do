@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TodoList from "@/components/TodoList";
 import BottomNav from "@/components/BottomNav";
 import { useProfile } from "@/hooks/use-profile";
@@ -7,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   const { data: profile } = useProfile();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -19,11 +21,15 @@ const Index = () => {
                 life.
               </h1>
             </div>
-            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-xs font-medium text-secondary-foreground">
-                {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
-              </span>
-            </div>
+            <button onClick={() => navigate("/me")} className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-medium text-secondary-foreground">
+                  {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
+                </span>
+              )}
+            </button>
           </div>
           {profile && (
             <p className="text-sm text-muted-foreground mt-1">

@@ -12,6 +12,7 @@ import GroupDetail from "./pages/GroupDetail";
 import Friends from "./pages/Friends";
 import FriendDetail from "./pages/FriendDetail";
 import FriendProfile from "./pages/FriendProfile";
+import MyPublicProfile from "./pages/MyPublicProfile";
 import News from "./pages/News";
 import Profile from "./pages/Profile";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
               <Route path="/friends/:id" element={<ProtectedRoute><FriendDetail /></ProtectedRoute>} />
               <Route path="/friends/:id/profile" element={<ProtectedRoute><FriendProfile /></ProtectedRoute>} />
+              <Route path="/me" element={<ProtectedRoute><MyPublicProfile /></ProtectedRoute>} />
               <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/privacy" element={<ProtectedRoute><PrivacyPolicy /></ProtectedRoute>} />

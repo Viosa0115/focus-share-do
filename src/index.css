@@ -151,6 +151,52 @@
     --shadow-card: 0 2px 8px -2px hsl(30 25% 30% / 0.08);
     --shadow-elevated: 0 8px 24px -4px hsl(30 25% 30% / 0.1);
   }
+
+  .pink {
+    --background: 349 40% 97%;
+    --foreground: 349 30% 15%;
+
+    --card: 349 30% 99%;
+    --card-foreground: 349 30% 15%;
+
+    --popover: 349 30% 99%;
+    --popover-foreground: 349 30% 15%;
+
+    --primary: 349 55% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 349 30% 92%;
+    --secondary-foreground: 349 30% 15%;
+
+    --muted: 349 25% 92%;
+    --muted-foreground: 349 15% 45%;
+
+    --accent: 349 30% 92%;
+    --accent-foreground: 349 30% 15%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 152 50% 38%;
+    --success-foreground: 0 0% 98%;
+
+    --border: 349 25% 88%;
+    --input: 349 25% 88%;
+    --ring: 349 55% 55%;
+
+    --sidebar-background: 349 40% 97%;
+    --sidebar-foreground: 349 30% 15%;
+    --sidebar-primary: 349 55% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 349 30% 92%;
+    --sidebar-accent-foreground: 349 30% 15%;
+    --sidebar-border: 349 25% 88%;
+    --sidebar-ring: 349 55% 55%;
+
+    --shadow-soft: 0 1px 3px 0 hsl(349 55% 55% / 0.06);
+    --shadow-card: 0 2px 8px -2px hsl(349 55% 55% / 0.08);
+    --shadow-elevated: 0 8px 24px -4px hsl(349 55% 55% / 0.1);
+  }
 }
 
 @layer base {

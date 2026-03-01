@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText, Heart as HeartIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { useTodoCompletions } from "@/hooks/use-todo-completions";
@@ -18,6 +18,11 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useTheme } from "@/lib/theme-context";
+import { useAura, useAuraRanking } from "@/hooks/use-aura";
+import { useSavedPosts } from "@/hooks/use-saved-posts";
+import { usePosts, useDeletePost } from "@/hooks/use-posts";
+import { useAllPostLikes, useRespectPoints, useAllRespectForPosts } from "@/hooks/use-post-interactions";
+import PostCard from "@/components/PostCard";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -27,6 +32,19 @@ const Profile = () => {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { data: aura = 0 } = useAura();
+  const { data: ranking } = useAuraRanking();
+  const { data: savedPosts = [] } = useSavedPosts();
+  const { data: allPosts = [] } = usePosts();
+  const deletePost = useDeletePost();
+  const myPosts = (allPosts as any[]).filter((p: any) => p.user_id === user?.id);
+  const savedPostObjects = (savedPosts as any[]).map((sp: any) => sp.posts).filter(Boolean);
+  const allDisplayPosts = [...myPosts, ...savedPostObjects.filter((sp: any) => !myPosts.find((mp: any) => mp.id === sp.id))];
+  const postIds = allDisplayPosts.map((p: any) => p.id);
+  const { data: allLikes = [] } = useAllPostLikes(postIds);
+  const { data: allRespect = [] } = useAllRespectForPosts(postIds);
+  const { data: todayRespect = [] } = useRespectPoints();
+  const hasGivenRespectToday = (todayRespect as any[]).length > 0;
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -151,6 +169,10 @@ const Profile = () => {
           ) : (
             <div className="text-center space-y-1">
               <h2 className="text-lg font-semibold text-foreground">{profile?.display_name || "—"}</h2>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-sm font-bold text-primary">✨ {aura} Aura</span>
+                {ranking && <span className="text-xs text-muted-foreground">#{ranking.rank} weltweit</span>}
+              </div>
               {profile?.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}
               <button onClick={startEdit} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2">
                 <Edit2 className="h-3 w-3" /> Bearbeiten
@@ -203,7 +225,12 @@ const Profile = () => {
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
           <p className="text-sm font-medium text-foreground">Design</p>
           <div className="flex gap-2">
-            {[{ value: "light" as const, label: "Light", icon: Sun }, { value: "dark" as const, label: "Dark", icon: Moon }, { value: "sand" as const, label: "Sand", icon: Mountain }].map(({ value, label, icon: Icon }) => (
+            {[
+              { value: "light" as const, label: "Light", icon: Sun },
+              { value: "dark" as const, label: "Dark", icon: Moon },
+              { value: "sand" as const, label: "Sand", icon: Mountain },
+              { value: "pink" as const, label: "Pink", icon: HeartIcon },
+            ].map(({ value, label, icon: Icon }) => (
               <button key={value} onClick={() => setTheme(value)} className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-medium transition-colors ${theme === value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
                 <Icon className="h-4 w-4" />{label}
               </button>
@@ -293,6 +320,29 @@ const Profile = () => {
             </Dialog>
           </div>
         </div>
+
+        {/* Saved Posts */}
+        {allDisplayPosts.length > 0 && (
+          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+            <p className="text-sm font-medium text-foreground">📌 Gespeicherte & eigene Beiträge</p>
+            <div className="space-y-4">
+              {allDisplayPosts.slice(0, 20).map((post: any) => {
+                const postProfile = post.profiles;
+                const isOwn = post.user_id === user?.id;
+                const likes = (allLikes as any[]).filter((l: any) => l.post_id === post.id);
+                const myLike = likes.find((l: any) => l.user_id === user?.id);
+                const respectCount = (allRespect as any[]).filter((r: any) => r.post_id === post.id).length;
+                return (
+                  <PostCard key={post.id} post={post} profile={postProfile || profile} isOwn={isOwn}
+                    likes={likes} myLike={!!myLike} respectCount={respectCount}
+                    hasGivenRespectToday={hasGivenRespectToday}
+                    onDelete={() => deletePost.mutate(post.id)}
+                    myDisplayName={profile?.display_name || ""} />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Email */}
         <div className="p-4 rounded-2xl bg-card shadow-soft">
