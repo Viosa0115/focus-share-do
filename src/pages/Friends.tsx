@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { UserPlus, Check, X, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
 import { useAllChatStreaks } from "@/hooks/use-chat-streaks";
+import { useFriendLastMessages, useUnreadDMCountPerFriend } from "@/hooks/use-friend-last-messages";
 import { StreakBadge } from "@/components/StreakBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import BottomNav from "@/components/BottomNav";
+import { format, isToday, isYesterday } from "date-fns";
+import { de } from "date-fns/locale";
 
 const Friends = () => {
   const { toast } = useToast();
@@ -22,6 +25,25 @@ const Friends = () => {
   const [hashtag, setHashtag] = useState("");
 
   const acceptedFriends = (friends as any[]).filter((f: any) => f.status === "accepted");
+  const friendshipIds = acceptedFriends.map((f: any) => f.id);
+  const { data: lastMessages = {} } = useFriendLastMessages(friendshipIds);
+  const { data: unreadCounts = {} } = useUnreadDMCountPerFriend(friendshipIds);
+
+  // Sort by last message time (most recent first)
+  const sortedFriends = [...acceptedFriends].sort((a: any, b: any) => {
+    const aMsg = (lastMessages as any)[a.id];
+    const bMsg = (lastMessages as any)[b.id];
+    const aTime = aMsg ? new Date(aMsg.created_at).getTime() : 0;
+    const bTime = bMsg ? new Date(bMsg.created_at).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const formatTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isToday(d)) return format(d, "HH:mm");
+    if (isYesterday(d)) return "Gestern";
+    return format(d, "dd.MM.", { locale: de });
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,16 +143,21 @@ const Friends = () => {
               <p className="text-xs text-muted-foreground">Füge Freunde über ihren Hashtag-Code hinzu</p>
             </div>
           ) : (
-            acceptedFriends.map((f: any) => {
+            sortedFriends.map((f: any) => {
               const profile = f.friend_profile;
+              const lastMsg = (lastMessages as any)[f.id];
+              const unread = (unreadCounts as any)[f.id] || 0;
+              const streak = (allStreaks as any[]).find((s: any) => s.friendship_id === f.id);
+
               return (
-                <div
+                <button
                   key={f.id}
+                  onClick={() => navigate(`/friends/${f.id}`)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft hover:bg-secondary/50 transition-colors text-left"
                 >
-                  <button
-                    onClick={() => navigate(`/friends/${f.id}/profile`)}
-                    className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0"
+                  <div
+                    onClick={(e) => { e.stopPropagation(); navigate(`/friends/${f.id}/profile`); }}
+                    className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0"
                   >
                     {profile?.avatar_url ? (
                       <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -139,19 +166,29 @@ const Friends = () => {
                         {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
                       </span>
                     )}
-                  </button>
-                  <button onClick={() => navigate(`/friends/${f.id}/profile`)} className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-medium text-foreground">{profile?.display_name || "Unbekannt"}</p>
-                    <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
-                  </button>
-                  {(() => {
-                    const streak = (allStreaks as any[]).find((s: any) => s.friendship_id === f.id);
-                    return streak?.current_streak > 0 ? <StreakBadge streak={streak.current_streak} size="sm" /> : null;
-                  })()}
-                  <button onClick={() => navigate(`/friends/${f.id}`)} className="text-muted-foreground hover:text-foreground transition-colors">
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
-                </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-foreground truncate">{profile?.display_name || "Unbekannt"}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {streak?.current_streak > 0 && <StreakBadge streak={streak.current_streak} size="sm" />}
+                        {lastMsg && (
+                          <span className="text-[10px] text-muted-foreground">{formatTime(lastMsg.created_at)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {lastMsg ? lastMsg.content : "Noch keine Nachrichten"}
+                      </p>
+                      {unread > 0 && (
+                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                          {unread > 99 ? "99+" : unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
               );
             })
           )}
