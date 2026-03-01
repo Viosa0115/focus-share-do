@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles, Search, Crown } from "lucide-react";
+import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2, Download, Eye, UserPlus, Sparkles, Search, Crown, Pin, BarChart3, Image as ImageIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { useGroupMessages, useSendMessage } from "@/hooks/use-group-chat";
+import { useGroupMessages, useSendMessage, useGroupChatMedia } from "@/hooks/use-group-chat";
 import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo } from "@/hooks/use-group-todos";
 import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp, useAcceptEndurance, useDeclineEndurance } from "@/hooks/use-challenges";
 import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
@@ -13,6 +13,8 @@ import { useGroupLists, useCreateGroupList, useDeleteGroupList } from "@/hooks/u
 import { useFriends } from "@/hooks/use-friends";
 import { useFlashbacks, useCreateFlashback, useUpdateFlashback, useFlashbackMedia, useUploadFlashbackMedia } from "@/hooks/use-flashbacks";
 import { createNotification } from "@/hooks/use-notifications";
+import { useGroupPolls, useCreatePoll, useVotePoll } from "@/hooks/use-polls";
+import { usePinnedMessages, useTogglePin } from "@/hooks/use-pinned-messages";
 import { GroupListDetail } from "@/components/GroupListDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,11 +125,21 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
   const { user } = useAuth();
   const { data: messages = [], isLoading } = useGroupMessages(groupId);
   const sendMessage = useSendMessage(groupId);
+  const { data: polls = [] } = useGroupPolls(groupId);
+  const createPoll = useCreatePoll(groupId);
+  const votePoll = useVotePoll(groupId);
+  const { data: pinnedMessages = [] } = usePinnedMessages(groupId);
+  const togglePin = useTogglePin(groupId);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [viewSnap, setViewSnap] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [showPollCreate, setShowPollCreate] = useState(false);
+  const [pollTitle, setPollTitle] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [pollDuration, setPollDuration] = useState("24");
+  const [showPinned, setShowPinned] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { data: members = [] } = useGroupMembers(groupId);
   const { toast } = useToast();
@@ -154,7 +166,7 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
       const { error: uploadErr } = await supabase.storage.from("chat-images").upload(path, file);
       if (uploadErr) throw uploadErr;
       const { data: urlData } = supabase.storage.from("chat-images").getPublicUrl(path);
-      const mediaLabel = file.type.startsWith("video") ? (isSnap ? "🎥 Snap" : "🎬 Video") : (isSnap ? "📸 Snap" : "📷 Bild");
+      const mediaLabel = file.type.startsWith("video") ? (isSnap ? "🎥 Flash" : "🎬 Video") : (isSnap ? "⚡ Flash" : "📷 Bild");
       const { error } = await supabase.from("group_messages").insert({
         group_id: groupId, user_id: user!.id,
         content: mediaLabel,
@@ -199,13 +211,29 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
     return false;
   };
 
+  const pinnedMsgIds = new Set((pinnedMessages as any[]).map((p: any) => p.message_id));
+
+  const handleDoubleClick = (msgId: string) => {
+    togglePin.mutate(msgId);
+    toast({ title: pinnedMsgIds.has(msgId) ? "Nachricht losgelöst" : "Nachricht angepinnt 📌" });
+  };
+
+  const handleCreatePoll = () => {
+    const validOptions = pollOptions.filter(o => o.trim());
+    if (!pollTitle.trim() || validOptions.length < 2) return;
+    const endsAt = new Date(Date.now() + parseInt(pollDuration) * 3600000).toISOString();
+    createPoll.mutate({ title: pollTitle, options: validOptions, ends_at: endsAt });
+    setPollTitle(""); setPollOptions(["", ""]); setShowPollCreate(false);
+    toast({ title: "Abstimmung erstellt! 📊" });
+  };
+
   const filteredMessages = searchQuery
     ? (messages as any[]).filter((m: any) => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))
     : messages;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search bar */}
+      {/* Search, Pin, Poll bar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50">
         <button onClick={() => setShowSearch(!showSearch)} className="text-muted-foreground hover:text-foreground">
           <Search className="h-4 w-4" />
@@ -214,7 +242,84 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
           <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Suchen..."
             className="h-8 rounded-lg bg-secondary border-0 text-xs text-foreground flex-1" autoFocus />
         )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {(pinnedMessages as any[]).length > 0 && (
+            <button onClick={() => setShowPinned(!showPinned)} className="text-muted-foreground hover:text-foreground relative">
+              <Pin className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary text-[7px] text-primary-foreground flex items-center justify-center">{(pinnedMessages as any[]).length}</span>
+            </button>
+          )}
+          <button onClick={() => setShowPollCreate(!showPollCreate)} className="text-muted-foreground hover:text-foreground">
+            <BarChart3 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Pinned messages drawer */}
+      {showPinned && (pinnedMessages as any[]).length > 0 && (
+        <div className="px-4 py-2 border-b border-border/50 bg-secondary/30 max-h-32 overflow-y-auto space-y-1.5">
+          <p className="text-[10px] font-semibold text-muted-foreground">📌 Angepinnt</p>
+          {(pinnedMessages as any[]).map((pin: any) => (
+            <div key={pin.id} className="text-xs text-foreground bg-card rounded-lg px-2 py-1.5 flex items-center justify-between">
+              <span className="truncate">{pin.group_messages?.content || "Nachricht"}</span>
+              <button onClick={() => { togglePin.mutate(pin.message_id); }} className="text-muted-foreground hover:text-destructive ml-2 flex-shrink-0">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Poll creation */}
+      {showPollCreate && (
+        <div className="px-4 py-3 border-b border-border/50 bg-secondary/30 space-y-2">
+          <Input value={pollTitle} onChange={e => setPollTitle(e.target.value)} placeholder="Abstimmungsfrage" className="h-8 rounded-lg bg-card border-0 text-xs text-foreground" />
+          {pollOptions.map((opt, i) => (
+            <Input key={i} value={opt} onChange={e => { const newOpts = [...pollOptions]; newOpts[i] = e.target.value; setPollOptions(newOpts); }}
+              placeholder={`Option ${i + 1}`} className="h-7 rounded-lg bg-card border-0 text-xs text-foreground" />
+          ))}
+          <div className="flex gap-2">
+            <button onClick={() => setPollOptions([...pollOptions, ""])} className="text-[10px] text-primary hover:underline">+ Option</button>
+            <select value={pollDuration} onChange={e => setPollDuration(e.target.value)} className="text-[10px] bg-card rounded px-1.5 py-0.5 text-foreground">
+              <option value="1">1 Stunde</option>
+              <option value="6">6 Stunden</option>
+              <option value="24">24 Stunden</option>
+              <option value="72">3 Tage</option>
+              <option value="168">7 Tage</option>
+            </select>
+            <button onClick={handleCreatePoll} className="ml-auto text-[10px] bg-primary text-primary-foreground px-3 py-1 rounded-lg">Erstellen</button>
+          </div>
+        </div>
+      )}
+
+      {/* Active polls */}
+      {(polls as any[]).filter((p: any) => !p.ends_at || new Date(p.ends_at) > new Date()).length > 0 && (
+        <div className="px-4 py-2 border-b border-border/50 space-y-2">
+          {(polls as any[]).filter((p: any) => !p.ends_at || new Date(p.ends_at) > new Date()).map((poll: any) => {
+            const options = (poll.options as string[]) || [];
+            const votes = (poll.votes || {}) as Record<string, number>;
+            const myVote = votes[user!.id];
+            const totalVotes = Object.keys(votes).length;
+            return (
+              <div key={poll.id} className="p-3 rounded-xl bg-card shadow-soft space-y-2">
+                <p className="text-xs font-medium text-foreground">📊 {poll.title}</p>
+                {options.map((opt: string, i: number) => {
+                  const voteCount = Object.values(votes).filter(v => v === i).length;
+                  const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                  return (
+                    <button key={i} onClick={() => votePoll.mutate({ pollId: poll.id, optionIndex: i, currentVotes: votes })}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors relative overflow-hidden ${myVote === i ? "bg-primary/20 text-primary font-medium" : "bg-secondary text-foreground hover:bg-secondary/80"}`}>
+                      <div className="absolute inset-y-0 left-0 bg-primary/10 transition-all" style={{ width: `${pct}%` }} />
+                      <span className="relative">{opt} {totalVotes > 0 && `(${pct}%)`}</span>
+                    </button>
+                  );
+                })}
+                <p className="text-[9px] text-muted-foreground">{totalVotes} Stimmen{poll.ends_at && ` · endet ${format(new Date(poll.ends_at), "dd.MM. HH:mm")}`}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
@@ -235,18 +340,18 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
             const wasViewed = (msg.viewed_by || []).includes(user!.id) && msg.user_id !== user?.id;
 
             return (
-              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-[80%] space-y-1">
+              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`} onDoubleClick={() => handleDoubleClick(msg.id)}>
+                <div className={`max-w-[80%] space-y-1 ${pinnedMsgIds.has(msg.id) ? "border-l-2 border-primary pl-1" : ""}`}>
                   {!isOwn && <span className="text-[10px] font-medium text-muted-foreground ml-1">{getDisplayName(msg.user_id)}</span>}
                   {hasImage ? (
                     isSnap && !canView ? (
                       <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"}`}>
-                        <p className="text-xs opacity-70">📸 Snap bereits angesehen</p>
+                        <p className="text-xs opacity-70">⚡ Flash bereits angesehen</p>
                       </div>
                     ) : isSnap && !wasViewed && msg.user_id !== user?.id ? (
                       <button onClick={() => handleViewSnap(msg)}
                         className={`px-4 py-3 rounded-2xl flex items-center gap-2 ${isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"}`}>
-                        <Eye className="h-4 w-4" /><span className="text-sm">Snap anzeigen</span>
+                        <Eye className="h-4 w-4" /><span className="text-sm">Flash anzeigen</span>
                       </button>
                     ) : (
                       <div className="relative">
@@ -271,7 +376,7 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
                   )}
                   <span className="text-[10px] text-muted-foreground ml-1">
                     {format(new Date(msg.created_at), "HH:mm")}
-                    {isSnap && isOwn && <span className="ml-1">📸</span>}
+                    {isSnap && isOwn && <span className="ml-1">⚡</span>}
                   </span>
                 </div>
               </div>
@@ -1500,11 +1605,94 @@ function SettingsTab({ groupId, group, isAdmin }: { groupId: string; group: any;
         )}
       </div>
 
+      {/* Media Gallery */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Medien</h3>
+        </div>
+        <MediaGallery groupId={groupId} />
+      </div>
+
+      {/* Pinned Messages in Settings */}
+      <PinnedMessagesSettings groupId={groupId} />
+
       {/* Danger zone */}
       <div className="space-y-3 pt-4 border-t border-border">
         <h3 className="text-sm font-semibold text-destructive">Gefahrenzone</h3>
         <Button variant="outline" className="w-full rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10" onClick={leaveGroup}>Gruppe verlassen</Button>
         {isOwner && <Button variant="destructive" className="w-full rounded-xl" onClick={deleteGroup}>Gruppe löschen</Button>}
+      </div>
+    </div>
+  );
+}
+
+/* ============ MEDIA GALLERY ============ */
+function MediaGallery({ groupId }: { groupId: string }) {
+  const { data: media = [] } = useGroupChatMedia(groupId);
+  const [viewIdx, setViewIdx] = useState<number | null>(null);
+  const { toast } = useToast();
+  const isVideo = (url: string) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
+
+  if ((media as any[]).length === 0) return <p className="text-xs text-muted-foreground">Keine Medien im Chat</p>;
+
+  return (
+    <>
+      <div className="grid grid-cols-4 gap-1.5">
+        {(media as any[]).slice(0, 40).map((m: any, i: number) => (
+          <button key={m.id} onClick={() => setViewIdx(i)} className="aspect-square rounded-lg overflow-hidden bg-secondary">
+            {isVideo(m.image_url) ? (
+              <video src={m.image_url} className="h-full w-full object-cover" />
+            ) : (
+              <img src={m.image_url} alt="" className="h-full w-full object-cover" />
+            )}
+          </button>
+        ))}
+      </div>
+      {viewIdx !== null && (
+        <div className="fixed inset-0 z-50 bg-background flex items-center justify-center" onClick={() => setViewIdx(null)}>
+          <div onClick={e => e.stopPropagation()} className="max-w-full max-h-[80vh] px-4">
+            {isVideo((media as any[])[viewIdx].image_url) ? (
+              <video src={(media as any[])[viewIdx].image_url} controls className="max-w-full max-h-[75vh]" />
+            ) : (
+              <img src={(media as any[])[viewIdx].image_url} alt="" className="max-w-full max-h-[75vh]" />
+            )}
+          </div>
+          <button onClick={() => setViewIdx(null)} className="absolute top-4 right-4 h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
+            <X className="h-4 w-4 text-foreground" />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); const a = document.createElement("a"); a.href = (media as any[])[viewIdx].image_url; a.download = "media"; a.target = "_blank"; a.click(); toast({ title: "Gespeichert ✓" }); }}
+            className="absolute bottom-4 right-4 h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
+            <Download className="h-4 w-4 text-foreground" />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ============ PINNED MESSAGES IN SETTINGS ============ */
+function PinnedMessagesSettings({ groupId }: { groupId: string }) {
+  const { data: pinnedMessages = [] } = usePinnedMessages(groupId);
+  const togglePin = useTogglePin(groupId);
+
+  if ((pinnedMessages as any[]).length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Pin className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold text-foreground">Angepinnte Nachrichten ({(pinnedMessages as any[]).length})</h3>
+      </div>
+      <div className="space-y-1.5">
+        {(pinnedMessages as any[]).map((pin: any) => (
+          <div key={pin.id} className="flex items-center justify-between p-2.5 rounded-xl bg-card shadow-soft">
+            <span className="text-xs text-foreground truncate flex-1">{pin.group_messages?.content || "Nachricht"}</span>
+            <button onClick={() => togglePin.mutate(pin.message_id)} className="text-muted-foreground hover:text-destructive ml-2">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

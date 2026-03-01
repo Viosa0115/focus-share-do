@@ -51,6 +51,7 @@ export function useUpdateChatStreak(friendshipId: string | undefined) {
       if (!friendshipId || !user) return;
       const today = new Date().toISOString().split("T")[0];
       const isUser1 = user.id === requesterId;
+      const myDateField = isUser1 ? "user1_last_msg_date" : "user2_last_msg_date";
 
       // Get or create streak record
       let { data: streak } = await supabase
@@ -62,7 +63,7 @@ export function useUpdateChatStreak(friendshipId: string | undefined) {
       if (!streak) {
         const insertData: any = {
           friendship_id: friendshipId,
-          [isUser1 ? "user1_last_msg_date" : "user2_last_msg_date"]: today,
+          [myDateField]: today,
         };
         const { data: newStreak, error } = await supabase
           .from("chat_streaks")
@@ -73,30 +74,33 @@ export function useUpdateChatStreak(friendshipId: string | undefined) {
         return newStreak;
       }
 
-      // Update the current user's last message date
+      // If I already messaged today, don't update streak again (max +1/day)
+      const myCurrentDate = isUser1 ? streak.user1_last_msg_date : streak.user2_last_msg_date;
+      if (myCurrentDate === today) return; // Already counted today
+
       const updateData: any = {
-        [isUser1 ? "user1_last_msg_date" : "user2_last_msg_date"]: today,
+        [myDateField]: today,
         updated_at: new Date().toISOString(),
       };
 
-      // Check if both users have messaged today
+      // Check if both users have messaged today (other already messaged today)
       const otherDate = isUser1 ? streak.user2_last_msg_date : streak.user1_last_msg_date;
       if (otherDate === today) {
-        // Both messaged today - update streak
+        // Both messaged today - update streak (max +1)
         const lastBothDate = streak.last_both_chatted_date;
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-        if (lastBothDate === yesterdayStr || lastBothDate === today) {
-          // Continue streak
+        if (lastBothDate === yesterdayStr) {
           updateData.current_streak = (streak.current_streak || 0) + 1;
-        } else {
-          // Start new streak
+        } else if (lastBothDate !== today) {
           updateData.current_streak = 1;
         }
         updateData.last_both_chatted_date = today;
-        updateData.best_streak = Math.max(streak.best_streak || 0, updateData.current_streak);
+        if (updateData.current_streak !== undefined) {
+          updateData.best_streak = Math.max(streak.best_streak || 0, updateData.current_streak);
+        }
       }
 
       const { error } = await supabase

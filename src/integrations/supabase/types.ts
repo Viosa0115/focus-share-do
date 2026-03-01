@@ -496,6 +496,7 @@ export type Database = {
           description: string | null
           group_id: string
           id: string
+          spotify_url: string | null
           title: string
           unlock_at: string
         }
@@ -507,6 +508,7 @@ export type Database = {
           description?: string | null
           group_id: string
           id?: string
+          spotify_url?: string | null
           title: string
           unlock_at: string
         }
@@ -518,6 +520,7 @@ export type Database = {
           description?: string | null
           group_id?: string
           id?: string
+          spotify_url?: string | null
           title?: string
           unlock_at?: string
         }
@@ -738,6 +741,86 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      group_pinned_messages: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          message_id: string
+          pinned_by: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          message_id: string
+          pinned_by: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          message_id?: string
+          pinned_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_pinned_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_pinned_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_polls: {
+        Row: {
+          created_at: string
+          created_by: string
+          ends_at: string | null
+          group_id: string
+          id: string
+          options: Json
+          title: string
+          votes: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          ends_at?: string | null
+          group_id: string
+          id?: string
+          options?: Json
+          title: string
+          votes?: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          ends_at?: string | null
+          group_id?: string
+          id?: string
+          options?: Json
+          title?: string
+          votes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_polls_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1058,6 +1141,38 @@ export type Database = {
           },
         ]
       }
+      post_comment_replies: {
+        Row: {
+          comment_id: string
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comment_replies_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           content: string
@@ -1314,6 +1429,41 @@ export type Database = {
           },
           {
             foreignKeyName: "todo_completions_todo_id_fkey"
+            columns: ["todo_id"]
+            isOneToOne: false
+            referencedRelation: "todos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      todo_invitations: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          id: string
+          status: string
+          to_user_id: string
+          todo_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          id?: string
+          status?: string
+          to_user_id: string
+          todo_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          status?: string
+          to_user_id?: string
+          todo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "todo_invitations_todo_id_fkey"
             columns: ["todo_id"]
             isOneToOne: false
             referencedRelation: "todos"

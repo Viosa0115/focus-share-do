@@ -29,7 +29,6 @@ export function useGroupMessages(groupId: string | undefined) {
         .eq("group_id", groupId!)
         .order("created_at", { ascending: true })
         .limit(200);
-      // If the join fails (no FK), fetch without join
       if (error) {
         const { data: msgs, error: e2 } = await supabase
           .from("group_messages")
@@ -57,5 +56,24 @@ export function useSendMessage(groupId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["group-messages", groupId] }),
+  });
+}
+
+// Get all media (images/videos) from group chat messages
+export function useGroupChatMedia(groupId: string | undefined) {
+  return useQuery({
+    queryKey: ["group-chat-media", groupId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("group_messages")
+        .select("id, image_url, user_id, created_at")
+        .eq("group_id", groupId!)
+        .not("image_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data?.filter(m => m.image_url) || [];
+    },
+    enabled: !!groupId,
   });
 }

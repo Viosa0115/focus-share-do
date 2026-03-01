@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send, ChevronRight, CheckCheck, Sparkles, Settings } from "lucide-react";
+import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send, ChevronRight, CheckCheck, Sparkles, Settings, UserCheck } from "lucide-react";
 import { useActivities } from "@/hooks/use-activities";
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useUnreadNotificationCount, createNotification } from "@/hooks/use-notifications";
 import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/hooks/use-notification-preferences";
 import { usePosts, useDeletePost } from "@/hooks/use-posts";
 import { useAllPostLikes, useToggleLike, usePostComments, useAddComment, useRespectPoints, useGiveRespect, useAllRespectForPosts } from "@/hooks/use-post-interactions";
+import { useTodoInvitations, useRespondTodoInvitation } from "@/hooks/use-todo-invitations";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -55,6 +57,8 @@ const News = () => {
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const { data: notifPrefs } = useNotificationPreferences();
   const updatePrefs = useUpdateNotificationPreferences();
+  const { data: todoInvitations = [] } = useTodoInvitations();
+  const respondInvitation = useRespondTodoInvitation();
   const [showNotifSettings, setShowNotifSettings] = useState(false);
 
   const { data: myProfile } = useQuery({
@@ -159,6 +163,28 @@ const News = () => {
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4 space-y-3">
+            {/* Todo Invitations */}
+            {(todoInvitations as any[]).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-foreground">📋 Todo-Einladungen</p>
+                {(todoInvitations as any[]).map((inv: any) => (
+                  <div key={inv.id} className="p-3 rounded-2xl bg-card shadow-soft space-y-2">
+                    <p className="text-sm font-medium text-foreground">{inv.todos?.title || "Aufgabe"}</p>
+                    {inv.todos?.description && <p className="text-xs text-muted-foreground">{inv.todos.description}</p>}
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1 rounded-xl h-8 text-xs"
+                        onClick={() => respondInvitation.mutate({ invitationId: inv.id, accept: true, todo: inv.todos })}>
+                        <UserCheck className="h-3 w-3 mr-1" /> Annehmen
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 rounded-xl h-8 text-xs"
+                        onClick={() => respondInvitation.mutate({ invitationId: inv.id, accept: false })}>
+                        Ablehnen
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Notification settings toggle */}
             <div className="flex items-center justify-between">
               {(unreadCount as number) > 0 && (
