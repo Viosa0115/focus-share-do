@@ -134,7 +134,7 @@ function DMChatTab({ friendshipId, friendship }: { friendshipId: string; friends
       const { data: urlData } = supabase.storage.from("chat-images").getPublicUrl(path);
       const { error } = await supabase.from("direct_messages").insert({
         friendship_id: friendshipId, sender_id: user!.id,
-        content: isSnap ? "📸 Snap" : "📷 Bild",
+        content: isSnap ? "⚡ Flash" : "📷 Bild",
         image_url: urlData.publicUrl, is_snap: isSnap, viewed_by: [], saved_by: [],
       } as any);
       if (error) throw error;
@@ -243,12 +243,12 @@ function DMChatTab({ friendshipId, friendship }: { friendshipId: string; friends
                   {hasImage ? (
                     isSnap && !canView ? (
                       <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"}`}>
-                        <p className="text-xs opacity-70">📸 Snap bereits angesehen</p>
+                        <p className="text-xs opacity-70">⚡ Flash bereits angesehen</p>
                       </div>
                     ) : isSnap && !wasViewed && msg.sender_id !== user?.id ? (
                       <button onClick={() => handleViewSnap(msg)}
                         className={`px-4 py-3 rounded-2xl flex items-center gap-2 ${isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"}`}>
-                        <Eye className="h-4 w-4" /><span className="text-sm">Snap anzeigen</span>
+                        <Eye className="h-4 w-4" /><span className="text-sm">Flash anzeigen</span>
                       </button>
                     ) : (
                       <div className="relative">
@@ -269,7 +269,7 @@ function DMChatTab({ friendshipId, friendship }: { friendshipId: string; friends
                   )}
                   <span className="text-[10px] text-muted-foreground ml-1">
                     {format(new Date(msg.created_at), "HH:mm")}
-                    {isSnap && isOwn && <span className="ml-1">📸</span>}
+                    {isSnap && isOwn && <span className="ml-1">⚡</span>}
                   </span>
                 </div>
               </div>
