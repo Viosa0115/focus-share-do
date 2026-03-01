@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send, ChevronRight, CheckCheck, Sparkles } from "lucide-react";
+import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send, ChevronRight, CheckCheck, Sparkles, Settings } from "lucide-react";
 import { useActivities } from "@/hooks/use-activities";
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useUnreadNotificationCount, createNotification } from "@/hooks/use-notifications";
+import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/hooks/use-notification-preferences";
 import { usePosts, useDeletePost } from "@/hooks/use-posts";
 import { useAllPostLikes, useToggleLike, usePostComments, useAddComment, useRespectPoints, useGiveRespect, useAllRespectForPosts } from "@/hooks/use-post-interactions";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -51,6 +53,9 @@ const News = () => {
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
+  const { data: notifPrefs } = useNotificationPreferences();
+  const updatePrefs = useUpdateNotificationPreferences();
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
 
   const { data: myProfile } = useQuery({
     queryKey: ["my-profile-name", user?.id],
@@ -154,12 +159,39 @@ const News = () => {
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4 space-y-3">
-            {(unreadCount as number) > 0 && (
-              <button onClick={() => markAllRead.mutate()}
-                className="flex items-center gap-1 text-xs text-primary hover:underline ml-auto">
-                <CheckCheck className="h-3 w-3" /> Alle gelesen
+            {/* Notification settings toggle */}
+            <div className="flex items-center justify-between">
+              {(unreadCount as number) > 0 && (
+                <button onClick={() => markAllRead.mutate()}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline">
+                  <CheckCheck className="h-3 w-3" /> Alle gelesen
+                </button>
+              )}
+              <button onClick={() => setShowNotifSettings(!showNotifSettings)} className="ml-auto text-muted-foreground hover:text-foreground">
+                <Settings className="h-4 w-4" />
               </button>
+            </div>
+
+            {showNotifSettings && notifPrefs && (
+              <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+                <p className="text-xs font-semibold text-foreground">Benachrichtigungseinstellungen</p>
+                {[
+                  { key: "likes", label: "Likes & Respect" },
+                  { key: "comments", label: "Kommentare" },
+                  { key: "todos", label: "Aufgaben" },
+                  { key: "events", label: "Events" },
+                  { key: "challenges", label: "Challenges" },
+                  { key: "chat_messages", label: "Chatnachrichten" },
+                  { key: "flashbacks", label: "Flashbacks" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-xs text-foreground">{label}</span>
+                    <Switch checked={(notifPrefs as any)?.[key] ?? true} onCheckedChange={(val) => updatePrefs.mutate({ [key]: val })} />
+                  </div>
+                ))}
+              </div>
             )}
+
             {notificationsLoading && activitiesLoading ? (
               [1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse" />)
             ) : mergedItems.length === 0 ? (
@@ -182,6 +214,7 @@ const News = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{item.title}</p>
+                      {item.from_user_name && <p className="text-[10px] text-primary mt-0.5">👤 {item.from_user_name}</p>}
                       {item.body && <p className="text-xs text-muted-foreground mt-0.5">{item.body}</p>}
                       {item.group_name && <p className="text-[10px] text-primary mt-0.5">📁 {item.group_name}</p>}
                       <p className="text-[10px] text-muted-foreground mt-1">

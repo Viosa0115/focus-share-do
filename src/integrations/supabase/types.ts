@@ -149,6 +149,50 @@ export type Database = {
           },
         ]
       }
+      chat_streaks: {
+        Row: {
+          best_streak: number
+          created_at: string
+          current_streak: number
+          friendship_id: string
+          id: string
+          last_both_chatted_date: string | null
+          updated_at: string
+          user1_last_msg_date: string | null
+          user2_last_msg_date: string | null
+        }
+        Insert: {
+          best_streak?: number
+          created_at?: string
+          current_streak?: number
+          friendship_id: string
+          id?: string
+          last_both_chatted_date?: string | null
+          updated_at?: string
+          user1_last_msg_date?: string | null
+          user2_last_msg_date?: string | null
+        }
+        Update: {
+          best_streak?: number
+          created_at?: string
+          current_streak?: number
+          friendship_id?: string
+          id?: string
+          last_both_chatted_date?: string | null
+          updated_at?: string
+          user1_last_msg_date?: string | null
+          user2_last_msg_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_streaks_friendship_id_fkey"
+            columns: ["friendship_id"]
+            isOneToOne: true
+            referencedRelation: "friendships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       direct_challenges: {
         Row: {
           best_time_creator: number | null
@@ -360,6 +404,7 @@ export type Database = {
       friendships: {
         Row: {
           addressee_id: string
+          auto_delete_messages: boolean
           created_at: string
           id: string
           requester_id: string
@@ -367,6 +412,7 @@ export type Database = {
         }
         Insert: {
           addressee_id: string
+          auto_delete_messages?: boolean
           created_at?: string
           id?: string
           requester_id: string
@@ -374,6 +420,7 @@ export type Database = {
         }
         Update: {
           addressee_id?: string
+          auto_delete_messages?: boolean
           created_at?: string
           id?: string
           requester_id?: string
@@ -778,6 +825,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          auto_delete_messages: boolean
           avatar_url: string | null
           created_at: string
           description: string | null
@@ -793,6 +841,7 @@ export type Database = {
           spotify_playlist_url: string | null
         }
         Insert: {
+          auto_delete_messages?: boolean
           avatar_url?: string | null
           created_at?: string
           description?: string | null
@@ -808,6 +857,7 @@ export type Database = {
           spotify_playlist_url?: string | null
         }
         Update: {
+          auto_delete_messages?: boolean
           avatar_url?: string | null
           created_at?: string
           description?: string | null
@@ -821,6 +871,48 @@ export type Database = {
           name?: string
           owner_id?: string
           spotify_playlist_url?: string | null
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          challenges: boolean
+          chat_messages: boolean
+          comments: boolean
+          created_at: string
+          events: boolean
+          flashbacks: boolean
+          id: string
+          likes: boolean
+          push_enabled: boolean
+          todos: boolean
+          user_id: string
+        }
+        Insert: {
+          challenges?: boolean
+          chat_messages?: boolean
+          comments?: boolean
+          created_at?: string
+          events?: boolean
+          flashbacks?: boolean
+          id?: string
+          likes?: boolean
+          push_enabled?: boolean
+          todos?: boolean
+          user_id: string
+        }
+        Update: {
+          challenges?: boolean
+          chat_messages?: boolean
+          comments?: boolean
+          created_at?: string
+          events?: boolean
+          flashbacks?: boolean
+          id?: string
+          likes?: boolean
+          push_enabled?: boolean
+          todos?: boolean
+          user_id?: string
         }
         Relationships: []
       }
