@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { UserPlus, Check, X, Users as UsersIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { UserPlus, Check, X, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import BottomNav from "@/components/BottomNav";
 
 const Friends = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { data: friends = [] } = useFriends();
   const { data: requests = [] } = useFriendRequests();
   const sendRequest = useSendFriendRequest();
@@ -119,17 +121,26 @@ const Friends = () => {
             acceptedFriends.map((f: any) => {
               const profile = f.friend_profile;
               return (
-                <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft">
-                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
-                    <span className="text-sm font-medium text-secondary-foreground">
-                      {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
-                    </span>
+                <button
+                  key={f.id}
+                  onClick={() => navigate(`/friends/${f.id}`)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft hover:bg-secondary/50 transition-colors text-left"
+                >
+                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-medium text-secondary-foreground">
+                        {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
+                      </span>
+                    )}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{profile?.display_name || "Unbekannt"}</p>
                     <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
                   </div>
-                </div>
+                  <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                </button>
               );
             })
           )}
