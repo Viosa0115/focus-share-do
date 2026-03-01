@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Send, Plus, Minus } from "lucide-react";
+import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Send, Plus, Minus, Camera, Eye, Save, X, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useDirectMessages, useSendDirectMessage, useDirectTodos, useCreateDirectTodo, useToggleDirectTodo, useDirectChallenges, useCreateDirectChallenge, useUpdateDirectChallengeScore } from "@/hooks/use-direct-messages";
 import { useFriends } from "@/hooks/use-friends";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 type TabKey = "chat" | "todos" | "challenges";
@@ -38,14 +40,19 @@ const FriendDetail = () => {
             <button onClick={() => navigate("/friends")} className="text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold text-secondary-foreground overflow-hidden">
-              {friendProfile?.avatar_url ? (
-                <img src={friendProfile.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                friendProfile?.display_name?.charAt(0)?.toUpperCase() || "?"
-              )}
-            </div>
-            <h1 className="font-semibold text-foreground truncate">{friendProfile?.display_name || "Freund"}</h1>
+            <button
+              onClick={() => navigate(`/friends/${friendshipId}/profile`)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold text-secondary-foreground overflow-hidden">
+                {friendProfile?.avatar_url ? (
+                  <img src={friendProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  friendProfile?.display_name?.charAt(0)?.toUpperCase() || "?"
+                )}
+              </div>
+              <h1 className="font-semibold text-foreground truncate">{friendProfile?.display_name || "Freund"}</h1>
+            </button>
           </div>
         </div>
         <div className="max-w-lg mx-auto px-4 flex gap-1">
@@ -74,11 +81,86 @@ function DMChatTab({ friendshipId }: { friendshipId: string }) {
   const { data: messages = [], isLoading } = useDirectMessages(friendshipId);
   const sendMessage = useSendDirectMessage(friendshipId);
   const [text, setText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [viewSnap, setViewSnap] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  const handleSendImage = async (e: React.ChangeEvent<HTMLInputElement>, isSnap: boolean) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user!.id}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("chat-images").upload(path, file);
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("chat-images").getPublicUrl(path);
+
+      const { error } = await supabase.from("direct_messages").insert({
+        friendship_id: friendshipId,
+        sender_id: user!.id,
+        content: isSnap ? "📸 Snap" : "📷 Bild",
+        image_url: urlData.publicUrl,
+        is_snap: isSnap,
+        viewed_by: [],
+        saved_by: [],
+      } as any);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["direct-messages", friendshipId] });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const handleViewSnap = async (msg: any) => {
+    setViewSnap(msg);
+    // Mark as viewed
+    const viewedBy = msg.viewed_by || [];
+    if (!viewedBy.includes(user!.id)) {
+      await supabase.from("direct_messages").update({
+        viewed_by: [...viewedBy, user!.id],
+      } as any).eq("id", msg.id);
+      qc.invalidateQueries({ queryKey: ["direct-messages", friendshipId] });
+    }
+  };
+
+  const handleSaveSnap = async (msg: any) => {
+    const savedBy = msg.saved_by || [];
+    if (!savedBy.includes(user!.id)) {
+      await supabase.from("direct_messages").update({
+        saved_by: [...savedBy, user!.id],
+      } as any).eq("id", msg.id);
+      qc.invalidateQueries({ queryKey: ["direct-messages", friendshipId] });
+    }
+    // Download image
+    if (msg.image_url) {
+      const a = document.createElement("a");
+      a.href = msg.image_url;
+      a.download = "snap.jpg";
+      a.target = "_blank";
+      a.click();
+    }
+    toast({ title: "Gespeichert ✓" });
+  };
+
+  const isSnapViewable = (msg: any) => {
+    if (!msg.is_snap) return true;
+    const viewedBy = msg.viewed_by || [];
+    const savedBy = msg.saved_by || [];
+    // Sender can always see, others can see once or if saved
+    if (msg.sender_id === user?.id) return true;
+    if (savedBy.includes(user!.id)) return true;
+    if (!viewedBy.includes(user!.id)) return true; // not viewed yet
+    return false;
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -94,16 +176,57 @@ function DMChatTab({ friendshipId }: { friendshipId: string }) {
         ) : (
           (messages as any[]).map((msg: any) => {
             const isOwn = msg.sender_id === user?.id;
+            const hasImage = !!msg.image_url;
+            const isSnap = msg.is_snap;
+            const canView = isSnapViewable(msg);
+            const viewedBy = msg.viewed_by || [];
+            const wasViewed = viewedBy.includes(user!.id) && msg.sender_id !== user?.id;
+
             return (
               <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
                 <div className="max-w-[80%] space-y-1">
-                  <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${
-                    isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"
-                  }`}>
-                    {msg.content}
-                  </div>
+                  {hasImage ? (
+                    isSnap && !canView ? (
+                      <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${
+                        isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"
+                      }`}>
+                        <p className="text-xs opacity-70">📸 Snap bereits angesehen</p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        {isSnap && !wasViewed && msg.sender_id !== user?.id ? (
+                          <button onClick={() => handleViewSnap(msg)}
+                            className={`px-4 py-3 rounded-2xl flex items-center gap-2 ${
+                              isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"
+                            }`}>
+                            <Eye className="h-4 w-4" />
+                            <span className="text-sm">Snap anzeigen</span>
+                          </button>
+                        ) : (
+                          <div className="relative">
+                            <img src={msg.image_url} alt="" className={`max-w-full rounded-2xl ${isOwn ? "rounded-br-md" : "rounded-bl-md"}`} />
+                            {isSnap && (
+                              <div className="absolute top-2 right-2 flex gap-1">
+                                <button onClick={() => handleSaveSnap(msg)}
+                                  className="h-7 w-7 rounded-full bg-background/70 flex items-center justify-center backdrop-blur-sm">
+                                  <Download className="h-3.5 w-3.5 text-foreground" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${
+                      isOwn ? "bg-primary text-primary-foreground rounded-br-md" : "bg-secondary text-secondary-foreground rounded-bl-md"
+                    }`}>
+                      {msg.content}
+                    </div>
+                  )}
                   <span className="text-[10px] text-muted-foreground ml-1">
                     {format(new Date(msg.created_at), "HH:mm")}
+                    {isSnap && isOwn && <span className="ml-1">📸</span>}
                   </span>
                 </div>
               </div>
@@ -111,10 +234,36 @@ function DMChatTab({ friendshipId }: { friendshipId: string }) {
           })
         )}
       </div>
+
+      {/* Snap viewer overlay */}
+      {viewSnap && (
+        <div className="fixed inset-0 z-50 bg-background/95 flex flex-col items-center justify-center" onClick={() => setViewSnap(null)}>
+          <img src={viewSnap.image_url} alt="" className="max-w-full max-h-[70vh] rounded-2xl" />
+          <div className="mt-4 flex gap-3">
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={(e) => { e.stopPropagation(); handleSaveSnap(viewSnap); }}>
+              <Download className="h-3 w-3 mr-1" /> Speichern
+            </Button>
+            <Button size="sm" variant="ghost" className="rounded-xl" onClick={() => setViewSnap(null)}>
+              <X className="h-3 w-3 mr-1" /> Schließen
+            </Button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={(e) => { e.preventDefault(); if (!text.trim()) return; sendMessage.mutate(text.trim()); setText(""); }} className="border-t border-border p-3 safe-bottom">
         <div className="max-w-lg mx-auto flex gap-2">
+          {/* Snap button */}
+          <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
+            <Camera className="h-4 w-4 text-muted-foreground" />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSendImage(e, true)} disabled={uploading} />
+          </label>
           <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Nachricht..." className="h-10 rounded-xl bg-secondary border-0 text-sm text-foreground" />
-          <button type="submit" disabled={!text.trim()} className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40">
+          {/* Regular image */}
+          <label className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center cursor-pointer hover:bg-accent transition-colors flex-shrink-0">
+            <Plus className="h-4 w-4 text-muted-foreground" />
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSendImage(e, false)} disabled={uploading} />
+          </label>
+          <button type="submit" disabled={!text.trim()} className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 flex-shrink-0">
             <Send className="h-4 w-4" />
           </button>
         </div>

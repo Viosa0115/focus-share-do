@@ -11,6 +11,7 @@ import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import Friends from "./pages/Friends";
 import FriendDetail from "./pages/FriendDetail";
+import FriendProfile from "./pages/FriendProfile";
 import News from "./pages/News";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/groups/:id" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
               <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
               <Route path="/friends/:id" element={<ProtectedRoute><FriendDetail /></ProtectedRoute>} />
+              <Route path="/friends/:id/profile" element={<ProtectedRoute><FriendProfile /></ProtectedRoute>} />
               <Route path="/news" element={<ProtectedRoute><News /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

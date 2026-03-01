@@ -26,6 +26,7 @@ const Groups = () => {
   const [hasTodos, setHasTodos] = useState(true);
   const [hasChallenges, setHasChallenges] = useState(false);
   const [hasEvents, setHasEvents] = useState(false);
+  const [hasFlashbacks, setHasFlashbacks] = useState(false);
 
   const { data: joinRequests = [] } = useJoinRequests();
   const respondRequest = useRespondJoinRequest();
@@ -62,7 +63,7 @@ const Groups = () => {
 
       const { data, error } = await supabase
         .from("groups")
-        .insert({ name: name.trim(), description: description.trim(), owner_id: user!.id, join_code: code, has_todos: hasTodos, has_challenges: hasChallenges, has_events: hasEvents })
+        .insert({ name: name.trim(), description: description.trim(), owner_id: user!.id, join_code: code, has_todos: hasTodos, has_challenges: hasChallenges, has_events: hasEvents, has_flashbacks: hasFlashbacks } as any)
         .select()
         .single();
       if (error) throw error;
@@ -84,6 +85,7 @@ const Groups = () => {
       setHasTodos(true);
       setHasChallenges(false);
       setHasEvents(false);
+      setHasFlashbacks(false);
       toast({ title: "Gruppe erstellt! 🎉" });
       navigate(`/groups/${data.id}`);
     },
@@ -223,6 +225,10 @@ const Groups = () => {
                       <div className="flex items-center justify-between py-1">
                         <span className="text-sm text-foreground">Events</span>
                         <Switch checked={hasEvents} onCheckedChange={setHasEvents} />
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-sm text-foreground">Flashback</span>
+                        <Switch checked={hasFlashbacks} onCheckedChange={setHasFlashbacks} />
                       </div>
                     </div>
                     <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim() || createGroup.isPending}>

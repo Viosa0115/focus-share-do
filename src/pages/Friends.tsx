@@ -121,12 +121,14 @@ const Friends = () => {
             acceptedFriends.map((f: any) => {
               const profile = f.friend_profile;
               return (
-                <button
+                <div
                   key={f.id}
-                  onClick={() => navigate(`/friends/${f.id}`)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-card shadow-soft hover:bg-secondary/50 transition-colors text-left"
                 >
-                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                  <button
+                    onClick={() => navigate(`/friends/${f.id}/profile`)}
+                    className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0"
+                  >
                     {profile?.avatar_url ? (
                       <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
                     ) : (
@@ -134,13 +136,15 @@ const Friends = () => {
                         {profile?.display_name?.charAt(0)?.toUpperCase() || "?"}
                       </span>
                     )}
-                  </div>
-                  <div className="flex-1">
+                  </button>
+                  <button onClick={() => navigate(`/friends/${f.id}/profile`)} className="flex-1 text-left min-w-0">
                     <p className="text-sm font-medium text-foreground">{profile?.display_name || "Unbekannt"}</p>
                     <p className="text-[10px] text-muted-foreground">#{profile?.hashtag_code}</p>
-                  </div>
-                  <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                </button>
+                  </button>
+                  <button onClick={() => navigate(`/friends/${f.id}`)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <MessageCircle className="h-4 w-4" />
+                  </button>
+                </div>
               );
             })
           )}
