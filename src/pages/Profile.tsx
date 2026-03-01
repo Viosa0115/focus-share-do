@@ -1,20 +1,26 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
+import { useTodoCompletions } from "@/hooks/use-todo-completions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import BottomNav from "@/components/BottomNav";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
+import { StreakBadge } from "@/components/StreakBadge";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
   const { data: profile } = useProfile();
+  const { data: completions = [] } = useTodoCompletions();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -109,6 +115,12 @@ const Profile = () => {
     setShowPassword(false);
     toast({ title: "Passwort geändert ✓" });
   };
+
+  // Group completions by recurrence type
+  const recurringCompletions = (completions as any[]).filter((c: any) => c.recurrence && c.recurrence !== "none");
+  const oneTimeCompletions = (completions as any[]).filter((c: any) => !c.recurrence || c.recurrence === "none");
+
+  const recurrenceLabel = (r: string) => r === "daily" ? "Täglich" : r === "weekly" ? "Wöchentlich" : r === "monthly" ? "Monatlich" : "";
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -206,6 +218,64 @@ const Profile = () => {
           </div>
         )}
 
+        {/* Completed Todos History */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <div className="flex items-center gap-2">
+            <CheckSquare2 className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Erledigte Aufgaben</p>
+            <span className="ml-auto text-xs text-muted-foreground">{(completions as any[]).length} gesamt</span>
+          </div>
+
+          {(completions as any[]).length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">Noch keine erledigten Aufgaben</p>
+          ) : (
+            <Tabs defaultValue="all">
+              <TabsList className="w-full rounded-xl h-8">
+                <TabsTrigger value="all" className="flex-1 rounded-lg text-[10px] h-7">Alle</TabsTrigger>
+                <TabsTrigger value="recurring" className="flex-1 rounded-lg text-[10px] h-7">Wiederkehrend</TabsTrigger>
+                <TabsTrigger value="onetime" className="flex-1 rounded-lg text-[10px] h-7">Einmalig</TabsTrigger>
+              </TabsList>
+
+              {[
+                { value: "all", items: completions as any[] },
+                { value: "recurring", items: recurringCompletions },
+                { value: "onetime", items: oneTimeCompletions },
+              ].map(({ value, items }) => (
+                <TabsContent key={value} value={value} className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                  {items.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">Keine Einträge</p>
+                  ) : (
+                    items.slice(0, 50).map((c: any) => (
+                      <div key={c.id} className="flex items-start gap-2 py-2 border-b border-border/30 last:border-0">
+                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Check className="h-3 w-3 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {c.todo_labels && (
+                              <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.todo_labels.color }} />
+                            )}
+                            <span className="text-xs font-medium text-foreground truncate">{c.title}</span>
+                            {c.recurrence && c.recurrence !== "none" && (
+                              <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">{recurrenceLabel(c.recurrence)}</span>
+                            )}
+                          </div>
+                          {c.description && (
+                            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{c.description}</p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {format(new Date(c.completed_at), "dd. MMM yyyy, HH:mm", { locale: de })}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </div>
+
         {/* Privacy Setting */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
           <p className="text-sm font-medium text-foreground">Datenschutz</p>
@@ -293,7 +363,6 @@ const Profile = () => {
             onClick={async () => {
               if (!confirm("Bist du sicher? Dein Konto und alle Daten werden unwiderruflich gelöscht.")) return;
               if (!confirm("Letzte Warnung: Diese Aktion kann NICHT rückgängig gemacht werden. Fortfahren?")) return;
-              // Delete profile data first, then sign out
               await supabase.from("todos").delete().eq("user_id", user!.id);
               await supabase.from("posts").delete().eq("user_id", user!.id);
               await supabase.from("profiles").delete().eq("user_id", user!.id);

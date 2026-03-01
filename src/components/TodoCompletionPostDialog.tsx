@@ -8,6 +8,7 @@ import { useFriends } from "@/hooks/use-friends";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { StreakBadge } from "@/components/StreakBadge";
 
 interface Props {
   open: boolean;
@@ -16,9 +17,11 @@ interface Props {
   groupTodoId?: string;
   groupId?: string;
   todoTitle: string;
+  todoDescription?: string | null;
+  streakCount?: number;
 }
 
-export function TodoCompletionPostDialog({ open, onClose, todoId, groupTodoId, groupId, todoTitle }: Props) {
+export function TodoCompletionPostDialog({ open, onClose, todoId, groupTodoId, groupId, todoTitle, todoDescription, streakCount }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const createPost = useCreatePost();
@@ -60,8 +63,13 @@ export function TodoCompletionPostDialog({ open, onClose, todoId, groupTodoId, g
       setUploading(false);
     }
 
+    // Build content with streak and description
+    let defaultContent = `✅ ${todoTitle} erledigt!`;
+    if (todoDescription) defaultContent += `\n📝 ${todoDescription}`;
+    if (streakCount && streakCount > 0) defaultContent += `\n🔥 Streak: ${streakCount}`;
+
     await createPost.mutateAsync({
-      content: content || `✅ ${todoTitle} erledigt!`,
+      content: content || defaultContent,
       image_url,
       todo_id: todoId || null,
       group_todo_id: groupTodoId || null,
@@ -84,8 +92,14 @@ export function TodoCompletionPostDialog({ open, onClose, todoId, groupTodoId, g
           <DialogTitle>Erfolg teilen 🎉</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="p-3 rounded-xl bg-secondary text-sm text-muted-foreground">
-            ✅ {todoTitle}
+          <div className="p-3 rounded-xl bg-secondary text-sm space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">✅ {todoTitle}</span>
+              {streakCount && streakCount > 0 ? <StreakBadge streak={streakCount} size="sm" /> : null}
+            </div>
+            {todoDescription && (
+              <p className="text-xs text-muted-foreground line-clamp-2">📝 {todoDescription}</p>
+            )}
           </div>
 
           <Textarea

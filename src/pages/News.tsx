@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send } from "lucide-react";
+import { Bell, Trophy, CheckSquare, Calendar, Users, Image, Trash2, Heart, MessageCircle, Award, Send, BellOff, BellRing } from "lucide-react";
 import { useActivities } from "@/hooks/use-activities";
 import { usePosts, useDeletePost } from "@/hooks/use-posts";
 import { useAllPostLikes, useToggleLike, usePostComments, useAddComment, useRespectPoints, useGiveRespect, useAllRespectForPosts } from "@/hooks/use-post-interactions";
@@ -19,17 +19,49 @@ const activityIconMap: Record<string, any> = {
   default: Bell,
 };
 
+const activityColorMap: Record<string, string> = {
+  todo: "text-emerald-500",
+  challenge: "text-amber-500",
+  event: "text-blue-500",
+  member: "text-violet-500",
+  default: "text-muted-foreground",
+};
+
 const News = () => {
   const { user } = useAuth();
   const { data: activities = [], isLoading: activitiesLoading } = useActivities();
   const { data: posts = [], isLoading: postsLoading } = usePosts();
   const deletePost = useDeletePost();
+  const { toast } = useToast();
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    return localStorage.getItem("notifications_enabled") === "true";
+  });
 
   const postIds = (posts as any[]).map((p: any) => p.id);
   const { data: allLikes = [] } = useAllPostLikes(postIds);
   const { data: allRespect = [] } = useAllRespectForPosts(postIds);
   const { data: todayRespect = [] } = useRespectPoints();
   const hasGivenRespectToday = (todayRespect as any[]).length > 0;
+
+  const toggleNotifications = async () => {
+    if (!notificationsEnabled) {
+      if ("Notification" in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          setNotificationsEnabled(true);
+          localStorage.setItem("notifications_enabled", "true");
+          toast({ title: "Push-Benachrichtigungen aktiviert 🔔" });
+        } else {
+          toast({ title: "Benachrichtigungen blockiert", description: "Bitte aktiviere sie in den Browser-Einstellungen.", variant: "destructive" });
+        }
+      }
+    } else {
+      setNotificationsEnabled(false);
+      localStorage.setItem("notifications_enabled", "false");
+      toast({ title: "Push-Benachrichtigungen deaktiviert 🔕" });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -43,7 +75,14 @@ const News = () => {
         <Tabs defaultValue="feed">
           <TabsList className="w-full rounded-xl">
             <TabsTrigger value="feed" className="flex-1 rounded-lg text-xs">Feed</TabsTrigger>
-            <TabsTrigger value="activity" className="flex-1 rounded-lg text-xs">Aktivitäten</TabsTrigger>
+            <TabsTrigger value="activity" className="flex-1 rounded-lg text-xs">
+              Aktivitäten
+              {(activities as any[]).length > 0 && (
+                <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center">
+                  {Math.min((activities as any[]).length, 99)}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="feed" className="mt-4 space-y-4">
@@ -81,20 +120,43 @@ const News = () => {
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4 space-y-3">
+            {/* Notification toggle */}
+            <div className="p-3 rounded-xl bg-card shadow-soft flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {notificationsEnabled ? <BellRing className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+                <div>
+                  <p className="text-xs font-medium text-foreground">Push-Benachrichtigungen</p>
+                  <p className="text-[10px] text-muted-foreground">{notificationsEnabled ? "Aktiviert" : "Deaktiviert"}</p>
+                </div>
+              </div>
+              <button
+                onClick={toggleNotifications}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  notificationsEnabled
+                    ? "bg-primary/10 text-primary"
+                    : "bg-secondary text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                }`}
+              >
+                {notificationsEnabled ? "Deaktivieren" : "Aktivieren"}
+              </button>
+            </div>
+
             {activitiesLoading ? (
               [1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse" />)
             ) : (activities as any[]).length === 0 ? (
               <div className="text-center py-16 space-y-2">
                 <Bell className="h-10 w-10 mx-auto text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">Noch keine Aktivitäten</p>
+                <p className="text-xs text-muted-foreground">Erstelle Todos, Challenges oder Events in deinen Gruppen</p>
               </div>
             ) : (
               (activities as any[]).map((activity: any) => {
                 const Icon = activityIconMap[activity.activity_type] || activityIconMap.default;
+                const colorClass = activityColorMap[activity.activity_type] || activityColorMap.default;
                 return (
                   <div key={activity.id} className="p-4 rounded-2xl bg-card shadow-soft flex items-start gap-3">
                     <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <Icon className={`h-4 w-4 ${colorClass}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{activity.title}</p>
@@ -168,7 +230,7 @@ function PostCard({ post, profile, isOwn, likes, myLike, respectCount, hasGivenR
       {post.image_url && <img src={post.image_url} alt="Post" className="w-full object-cover max-h-72" />}
 
       <div className="px-4 pb-2 pt-2 space-y-2">
-        {post.content && <p className="text-sm text-foreground">{post.content}</p>}
+        {post.content && <p className="text-sm text-foreground whitespace-pre-line">{post.content}</p>}
         {post.tagged_user_ids?.length > 0 && (
           <p className="text-xs text-muted-foreground">👥 {post.tagged_user_ids.length} markiert</p>
         )}
@@ -182,13 +244,13 @@ function PostCard({ post, profile, isOwn, likes, myLike, respectCount, hasGivenR
           {likes.length > 0 && <span>{likes.length}</span>}
         </button>
         <button onClick={() => setShowComments(!showComments)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors">
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors ${showComments ? "text-foreground bg-secondary" : "text-muted-foreground hover:bg-secondary"}`}>
           <MessageCircle className="h-4 w-4" />
           {(comments as any[]).length > 0 && <span>{(comments as any[]).length}</span>}
         </button>
         <button onClick={handleRespect}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors ${hasGivenRespectToday ? "text-muted-foreground/40" : "text-muted-foreground hover:bg-secondary"}`}
-          disabled={hasGivenRespectToday}>
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors ${hasGivenRespectToday || post.user_id === user?.id ? "text-muted-foreground/40" : "text-muted-foreground hover:bg-secondary"}`}
+          disabled={hasGivenRespectToday || post.user_id === user?.id}>
           <Award className="h-4 w-4" />
           {respectCount > 0 && <span>{respectCount}</span>}
         </button>
