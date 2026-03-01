@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save } from "lucide-react";
+import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Calendar, Copy, Users, Settings, Send, Plus, Minus, Play, Square, Clock, Flag, Shield, ShieldCheck, Camera, X, Save, List, Music, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,8 @@ import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo } from "@/hooks/u
 import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp } from "@/hooks/use-challenges";
 import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
 import { useGroupMembers } from "@/hooks/use-group-members";
+import { useGroupLists, useCreateGroupList, useDeleteGroupList } from "@/hooks/use-group-lists";
+import { GroupListDetail } from "@/components/GroupListDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,20 +96,19 @@ const GroupDetail = () => {
             </button>
           </div>
         </div>
-        {/* Tab bar */}
+        {/* Tab bar - icon only */}
         <div className="max-w-lg mx-auto px-4 flex gap-1">
-          {tabs.filter(t => t.show).map(({ key, label, icon: Icon }) => (
+          {tabs.filter(t => t.show).map(({ key, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex-1 flex items-center justify-center py-2.5 border-b-2 transition-colors ${
                 activeTab === key
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
+              <Icon className="h-4 w-4" />
             </button>
           ))}
         </div>
@@ -214,138 +215,217 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
   const createTodo = useCreateGroupTodo(groupId);
   const toggleTodo = useToggleGroupTodo(groupId);
   const { data: members = [] } = useGroupMembers(groupId);
+  const { data: lists = [] } = useGroupLists(groupId);
+  const createList = useCreateGroupList(groupId);
+  const deleteList = useDeleteGroupList(groupId);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateList, setShowCreateList] = useState(false);
   const [title, setTitle] = useState("");
   const [completionType, setCompletionType] = useState<"single" | "all">("single");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [recurrence, setRecurrence] = useState("");
+  const [listName, setListName] = useState("");
+  const [listDesc, setListDesc] = useState("");
+  const [activeList, setActiveList] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<"todos" | "lists">("todos");
 
   const getDisplayName = (userId: string) => {
     const member = members.find((m: any) => m.user_id === userId);
     return (member as any)?.profiles?.display_name || "Nutzer";
   };
 
+  if (activeList) {
+    return (
+      <div className="overflow-y-auto h-full px-4 py-4">
+        <GroupListDetail list={activeList} onBack={() => setActiveList(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-y-auto h-full px-4 py-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Gruppenaufgaben</h3>
-        {canTodos && (
-          <Dialog open={showCreate} onOpenChange={setShowCreate}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="rounded-xl text-xs h-8">
-                <Plus className="h-3 w-3 mr-1" /> Neu
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl">
-              <DialogHeader><DialogTitle>Neue Aufgabe</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                createTodo.mutate({ title, completionType, dueDate: dueDate || undefined, dueTime: dueTime || undefined, recurrence: recurrence || undefined });
-                setTitle(""); setDueDate(""); setDueTime(""); setRecurrence("");
-                setShowCreate(false);
-              }} className="space-y-4">
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Aufgabe..." required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Erledigung</label>
-                  <div className="flex gap-2">
-                    {[
-                      { val: "single" as const, label: "Eine Person" },
-                      { val: "all" as const, label: "Alle Mitglieder" },
-                    ].map(({ val, label }) => (
-                      <button key={val} type="button" onClick={() => setCompletionType(val)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${completionType === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Input value={dueDate} onChange={(e) => setDueDate(e.target.value)} type="date" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
-                  <Input value={dueTime} onChange={(e) => setDueTime(e.target.value)} type="time" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Wiederholung</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      { val: "", label: "Keine" },
-                      { val: "daily", label: "Täglich" },
-                      { val: "weekly", label: "Wöchentlich" },
-                      { val: "monthly", label: "Monatlich" },
-                    ].map(({ val, label }) => (
-                      <button key={val} type="button" onClick={() => setRecurrence(val)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${recurrence === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Button type="submit" className="w-full h-12 rounded-xl" disabled={!title.trim()}>Erstellen</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+      {/* Toggle: Todos vs Lists */}
+      <div className="flex gap-1 p-1 rounded-xl bg-secondary">
+        <button onClick={() => setViewMode("todos")} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === "todos" ? "bg-card text-foreground shadow-soft" : "text-muted-foreground"}`}>
+          Aufgaben
+        </button>
+        <button onClick={() => setViewMode("lists")} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === "lists" ? "bg-card text-foreground shadow-soft" : "text-muted-foreground"}`}>
+          Listen
+        </button>
       </div>
 
-      {!canTodos && (
-        <p className="text-center text-xs text-muted-foreground py-4">Du hast keine Aufgaben-Berechtigung</p>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-secondary animate-pulse" />)}</div>
-      ) : todos.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground py-12">Noch keine Gruppenaufgaben</p>
-      ) : (
-        <div className="space-y-2">
-          {todos.map((todo: any) => {
-            const completions = todo.group_todo_completions || [];
-            const myCompletion = completions.find((c: any) => c.user_id === user?.id);
-            const totalMembers = members.length;
-            const completedCount = completions.length;
-            const isDone = todo.completion_type === "single" ? completedCount > 0 : completedCount >= totalMembers;
-
-            return (
-              <div key={todo.id} className={`p-3 rounded-xl bg-card shadow-soft transition-all duration-200 ${isDone ? "opacity-60" : ""}`}>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => canTodos && toggleTodo.mutate({ todoId: todo.id, completed: !myCompletion })}
-                    disabled={!canTodos}
-                    className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${myCompletion ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
-                    {myCompletion && <CheckSquare className="h-3 w-3 text-primary-foreground" />}
-                  </button>
-                  <div className="flex-1">
-                    <span className={`text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.title}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-muted-foreground">
-                        {completedCount}/{todo.completion_type === "all" ? totalMembers : 1} erledigt
-                      </p>
-                      {todo.due_date && (
-                        <p className="text-[10px] text-muted-foreground">
-                          📅 {format(new Date(todo.due_date), "dd.MM.")}
-                          {todo.due_time && ` ${todo.due_time.slice(0, 5)}`}
-                        </p>
-                      )}
-                      {todo.recurrence && (
-                        <p className="text-[10px] text-muted-foreground">
-                          🔄 {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}
-                        </p>
-                      )}
-                    </div>
-                    {/* Show who completed */}
-                    {todo.completion_type === "all" && completions.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {completions.map((c: any) => (
-                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                            ✓ {getDisplayName(c.user_id)}
-                          </span>
+      {viewMode === "todos" ? (
+        <>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Gruppenaufgaben</h3>
+            {canTodos && (
+              <Dialog open={showCreate} onOpenChange={setShowCreate}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="rounded-xl text-xs h-8">
+                    <Plus className="h-3 w-3 mr-1" /> Neu
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-2xl">
+                  <DialogHeader><DialogTitle>Neue Aufgabe</DialogTitle></DialogHeader>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    createTodo.mutate({ title, completionType, dueDate: dueDate || undefined, dueTime: dueTime || undefined, recurrence: recurrence || undefined });
+                    setTitle(""); setDueDate(""); setDueTime(""); setRecurrence("");
+                    setShowCreate(false);
+                  }} className="space-y-4">
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Aufgabe..." required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Erledigung</label>
+                      <div className="flex gap-2">
+                        {[
+                          { val: "single" as const, label: "Eine Person" },
+                          { val: "all" as const, label: "Alle Mitglieder" },
+                        ].map(({ val, label }) => (
+                          <button key={val} type="button" onClick={() => setCompletionType(val)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${completionType === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                            {label}
+                          </button>
                         ))}
                       </div>
-                    )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input value={dueDate} onChange={(e) => setDueDate(e.target.value)} type="date" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+                      <Input value={dueTime} onChange={(e) => setDueTime(e.target.value)} type="time" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Wiederholung</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {[
+                          { val: "", label: "Keine" },
+                          { val: "daily", label: "Täglich" },
+                          { val: "weekly", label: "Wöchentlich" },
+                          { val: "monthly", label: "Monatlich" },
+                        ].map(({ val, label }) => (
+                          <button key={val} type="button" onClick={() => setRecurrence(val)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${recurrence === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!title.trim()}>Erstellen</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {!canTodos && (
+            <p className="text-center text-xs text-muted-foreground py-4">Du hast keine Aufgaben-Berechtigung</p>
+          )}
+
+          {isLoading ? (
+            <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-secondary animate-pulse" />)}</div>
+          ) : todos.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-12">Noch keine Gruppenaufgaben</p>
+          ) : (
+            <div className="space-y-2">
+              {todos.map((todo: any) => {
+                const completions = todo.group_todo_completions || [];
+                const myCompletion = completions.find((c: any) => c.user_id === user?.id);
+                const totalMembers = members.length;
+                const completedCount = completions.length;
+                const isDone = todo.completion_type === "single" ? completedCount > 0 : completedCount >= totalMembers;
+
+                return (
+                  <div key={todo.id} className={`p-3 rounded-xl bg-card shadow-soft transition-all duration-200 ${isDone ? "opacity-60" : ""}`}>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => canTodos && toggleTodo.mutate({ todoId: todo.id, completed: !myCompletion })}
+                        disabled={!canTodos}
+                        className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${myCompletion ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
+                        {myCompletion && <CheckSquare className="h-3 w-3 text-primary-foreground" />}
+                      </button>
+                      <div className="flex-1">
+                        <span className={`text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.title}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[10px] text-muted-foreground">
+                            {completedCount}/{todo.completion_type === "all" ? totalMembers : 1} erledigt
+                          </p>
+                          {todo.due_date && (
+                            <p className="text-[10px] text-muted-foreground">
+                              📅 {format(new Date(todo.due_date), "dd.MM.")}
+                              {todo.due_time && ` ${todo.due_time.slice(0, 5)}`}
+                            </p>
+                          )}
+                          {todo.recurrence && (
+                            <p className="text-[10px] text-muted-foreground">
+                              🔄 {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}
+                            </p>
+                          )}
+                        </div>
+                        {todo.completion_type === "all" && completions.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {completions.map((c: any) => (
+                              <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                ✓ {getDisplayName(c.user_id)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        /* LISTS VIEW */
+        <>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Listen</h3>
+            {canTodos && (
+              <Dialog open={showCreateList} onOpenChange={setShowCreateList}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="rounded-xl text-xs h-8">
+                    <Plus className="h-3 w-3 mr-1" /> Neu
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-2xl">
+                  <DialogHeader><DialogTitle>Neue Liste</DialogTitle></DialogHeader>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    createList.mutate({ name: listName, description: listDesc });
+                    setListName(""); setListDesc(""); setShowCreateList(false);
+                  }} className="space-y-4">
+                    <Input value={listName} onChange={(e) => setListName(e.target.value)} placeholder="Name (z.B. Sommer)" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <Input value={listDesc} onChange={(e) => setListDesc(e.target.value)} placeholder="Beschreibung (optional)" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <Button type="submit" className="w-full h-12 rounded-xl" disabled={!listName.trim()}>Erstellen</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {(lists as any[]).length === 0 ? (
+            <div className="text-center py-12 space-y-2">
+              <List className="h-10 w-10 mx-auto text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Noch keine Listen</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(lists as any[]).map((list: any) => (
+                <button key={list.id} onClick={() => setActiveList(list)}
+                  className="w-full p-3 rounded-xl bg-card shadow-soft text-left hover:bg-secondary/50 transition-colors flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
+                    <List className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{list.name}</p>
+                    {list.description && <p className="text-xs text-muted-foreground truncate">{list.description}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -737,6 +817,8 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
   const [editDesc, setEditDesc] = useState("");
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [spotifyUrl, setSpotifyUrl] = useState("");
+  const [editingSpotify, setEditingSpotify] = useState(false);
 
   const isOwner = group?.owner_id === user?.id;
   const myMember = members.find((m: any) => m.user_id === user?.id);
@@ -910,6 +992,38 @@ function SettingsTab({ groupId, group }: { groupId: string; group: any }) {
         </div>
       </div>
       )}
+
+      {/* Spotify Playlist */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Music className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Spotify Playlist</h3>
+        </div>
+        {editingSpotify ? (
+          <div className="space-y-2">
+            <Input value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="Spotify Playlist URL" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+            <Button size="sm" className="rounded-xl text-xs h-8" onClick={async () => {
+              await supabase.from("groups").update({ spotify_playlist_url: spotifyUrl } as any).eq("id", groupId);
+              qc.invalidateQueries({ queryKey: ["group", groupId] });
+              setEditingSpotify(false);
+              toast({ title: "Playlist gespeichert ✓" });
+            }}>Speichern</Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            {(group as any)?.spotify_playlist_url ? (
+              <a href={(group as any).spotify_playlist_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline truncate max-w-[200px]">
+                🎵 Playlist öffnen
+              </a>
+            ) : (
+              <p className="text-xs text-muted-foreground">Keine Playlist verlinkt</p>
+            )}
+            {isSettingsAdmin && (
+              <button onClick={() => { setSpotifyUrl((group as any)?.spotify_playlist_url || ""); setEditingSpotify(true); }} className="text-xs text-muted-foreground hover:text-foreground">Bearbeiten</button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Danger zone */}
       <div className="space-y-3 pt-4 border-t border-border">

@@ -140,6 +140,135 @@ export type Database = {
           },
         ]
       }
+      direct_challenges: {
+        Row: {
+          best_time_creator: number | null
+          best_time_friend: number | null
+          challenge_type: string
+          created_at: string
+          created_by: string
+          ended_at: string | null
+          friendship_id: string
+          id: string
+          name: string
+          score_creator: number | null
+          score_friend: number | null
+          started_at: string | null
+        }
+        Insert: {
+          best_time_creator?: number | null
+          best_time_friend?: number | null
+          challenge_type: string
+          created_at?: string
+          created_by: string
+          ended_at?: string | null
+          friendship_id: string
+          id?: string
+          name: string
+          score_creator?: number | null
+          score_friend?: number | null
+          started_at?: string | null
+        }
+        Update: {
+          best_time_creator?: number | null
+          best_time_friend?: number | null
+          challenge_type?: string
+          created_at?: string
+          created_by?: string
+          ended_at?: string | null
+          friendship_id?: string
+          id?: string
+          name?: string
+          score_creator?: number | null
+          score_friend?: number | null
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_challenges_friendship_id_fkey"
+            columns: ["friendship_id"]
+            isOneToOne: false
+            referencedRelation: "friendships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          friendship_id: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          friendship_id: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          friendship_id?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_messages_friendship_id_fkey"
+            columns: ["friendship_id"]
+            isOneToOne: false
+            referencedRelation: "friendships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      direct_todos: {
+        Row: {
+          completed_by: string[] | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          friendship_id: string
+          id: string
+          recurrence: string | null
+          title: string
+        }
+        Insert: {
+          completed_by?: string[] | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          friendship_id: string
+          id?: string
+          recurrence?: string | null
+          title: string
+        }
+        Update: {
+          completed_by?: string[] | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          friendship_id?: string
+          id?: string
+          recurrence?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_todos_friendship_id_fkey"
+            columns: ["friendship_id"]
+            isOneToOne: false
+            referencedRelation: "friendships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_rsvps: {
         Row: {
           created_at: string
@@ -280,6 +409,79 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "group_join_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_list_items: {
+        Row: {
+          completed: boolean
+          completed_by: string | null
+          created_at: string
+          id: string
+          list_id: string
+          position: number
+          title: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          list_id: string
+          position?: number
+          title: string
+        }
+        Update: {
+          completed?: boolean
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          list_id?: string
+          position?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "group_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_lists: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          group_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          group_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          group_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_lists_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
@@ -466,6 +668,7 @@ export type Database = {
           max_members: number
           name: string
           owner_id: string
+          spotify_playlist_url: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -479,6 +682,7 @@ export type Database = {
           max_members?: number
           name: string
           owner_id: string
+          spotify_playlist_url?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -492,6 +696,7 @@ export type Database = {
           max_members?: number
           name?: string
           owner_id?: string
+          spotify_playlist_url?: string | null
         }
         Relationships: []
       }
@@ -720,7 +925,12 @@ export type Database = {
           display_name: string
           hashtag_code: string
           id: string
+          instagram: string | null
           is_private: boolean
+          pinterest: string | null
+          snapchat: string | null
+          spotify: string | null
+          tiktok: string | null
           updated_at: string
           user_id: string
         }
@@ -731,7 +941,12 @@ export type Database = {
           display_name?: string
           hashtag_code: string
           id?: string
+          instagram?: string | null
           is_private?: boolean
+          pinterest?: string | null
+          snapchat?: string | null
+          spotify?: string | null
+          tiktok?: string | null
           updated_at?: string
           user_id: string
         }
@@ -742,7 +957,12 @@ export type Database = {
           display_name?: string
           hashtag_code?: string
           id?: string
+          instagram?: string | null
           is_private?: boolean
+          pinterest?: string | null
+          snapchat?: string | null
+          spotify?: string | null
+          tiktok?: string | null
           updated_at?: string
           user_id?: string
         }

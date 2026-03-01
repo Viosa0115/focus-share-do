@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Trophy } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { useTodoCompletions } from "@/hooks/use-todo-completions";
@@ -16,6 +16,7 @@ import BottomNav from "@/components/BottomNav";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { StreakBadge } from "@/components/StreakBadge";
+import { useTheme } from "@/lib/theme-context";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -23,6 +24,7 @@ const Profile = () => {
   const { data: completions = [] } = useTodoCompletions();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { theme, setTheme } = useTheme();
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -33,10 +35,45 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Social links
+  const [editingSocial, setEditingSocial] = useState(false);
+  const [socialLinks, setSocialLinks] = useState({
+    instagram: "",
+    tiktok: "",
+    pinterest: "",
+    spotify: "",
+    snapchat: "",
+  });
+
   const startEdit = () => {
     setDisplayName(profile?.display_name || "");
     setBio(profile?.bio || "");
     setEditing(true);
+  };
+
+  const startEditSocial = () => {
+    setSocialLinks({
+      instagram: (profile as any)?.instagram || "",
+      tiktok: (profile as any)?.tiktok || "",
+      pinterest: (profile as any)?.pinterest || "",
+      spotify: (profile as any)?.spotify || "",
+      snapchat: (profile as any)?.snapchat || "",
+    });
+    setEditingSocial(true);
+  };
+
+  const saveSocial = async () => {
+    const { error } = await supabase
+      .from("profiles")
+      .update(socialLinks as any)
+      .eq("user_id", user!.id);
+    if (error) {
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["profile"] });
+    setEditingSocial(false);
+    toast({ title: "Social Links gespeichert ✓" });
   };
 
   const saveProfile = async () => {
@@ -116,11 +153,19 @@ const Profile = () => {
     toast({ title: "Passwort geändert ✓" });
   };
 
-  // Group completions by recurrence type
   const recurringCompletions = (completions as any[]).filter((c: any) => c.recurrence && c.recurrence !== "none");
   const oneTimeCompletions = (completions as any[]).filter((c: any) => !c.recurrence || c.recurrence === "none");
-
   const recurrenceLabel = (r: string) => r === "daily" ? "Täglich" : r === "weekly" ? "Wöchentlich" : r === "monthly" ? "Monatlich" : "";
+
+  const socialPlatforms = [
+    { key: "instagram", label: "Instagram", prefix: "@" },
+    { key: "tiktok", label: "TikTok", prefix: "@" },
+    { key: "pinterest", label: "Pinterest", prefix: "@" },
+    { key: "spotify", label: "Spotify", prefix: "" },
+    { key: "snapchat", label: "Snapchat", prefix: "@" },
+  ];
+
+  const hasSocialLinks = socialPlatforms.some(p => (profile as any)?.[p.key]);
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -159,35 +204,15 @@ const Profile = () => {
 
           {editing ? (
             <div className="w-full space-y-3">
-              <Input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Name"
-                className="h-12 rounded-xl bg-secondary border-0 text-center text-foreground"
-              />
-              <Textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Bio (optional)"
-                className="rounded-xl bg-secondary border-0 text-sm resize-none text-foreground"
-                rows={3}
-              />
-              <Button onClick={saveProfile} className="w-full h-12 rounded-xl">
-                <Check className="h-4 w-4 mr-1" /> Speichern
-              </Button>
+              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Name" className="h-12 rounded-xl bg-secondary border-0 text-center text-foreground" />
+              <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio (optional)" className="rounded-xl bg-secondary border-0 text-sm resize-none text-foreground" rows={3} />
+              <Button onClick={saveProfile} className="w-full h-12 rounded-xl"><Check className="h-4 w-4 mr-1" /> Speichern</Button>
             </div>
           ) : (
             <div className="text-center space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">
-                {profile?.display_name || "—"}
-              </h2>
-              {profile?.bio && (
-                <p className="text-sm text-muted-foreground">{profile.bio}</p>
-              )}
-              <button
-                onClick={startEdit}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
-              >
+              <h2 className="text-lg font-semibold text-foreground">{profile?.display_name || "—"}</h2>
+              {profile?.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}
+              <button onClick={startEdit} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2">
                 <Edit2 className="h-3 w-3" /> Bearbeiten
               </button>
             </div>
@@ -199,24 +224,78 @@ const Profile = () => {
           <div className="p-4 rounded-2xl bg-card shadow-soft space-y-2">
             <p className="text-xs text-muted-foreground">Dein Hashtag-Code</p>
             <div className="flex items-center justify-between">
-              <span className="text-lg font-mono font-semibold tracking-widest text-foreground">
-                #{profile.hashtag_code}
-              </span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(profile.hashtag_code);
-                  toast({ title: "Code kopiert!" });
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <span className="text-lg font-mono font-semibold tracking-widest text-foreground">#{profile.hashtag_code}</span>
+              <button onClick={() => { navigator.clipboard.writeText(profile.hashtag_code); toast({ title: "Code kopiert!" }); }} className="text-muted-foreground hover:text-foreground transition-colors">
                 <Copy className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Teile diesen Code, damit dich Freunde finden können
-            </p>
+            <p className="text-xs text-muted-foreground">Teile diesen Code, damit dich Freunde finden können</p>
           </div>
         )}
+
+        {/* Social Links */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Instagram className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Social Media</p>
+            </div>
+            <button onClick={startEditSocial} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Edit2 className="h-3 w-3" />
+            </button>
+          </div>
+
+          {editingSocial ? (
+            <div className="space-y-2">
+              {socialPlatforms.map(p => (
+                <div key={p.key} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-20">{p.label}</span>
+                  <Input
+                    value={(socialLinks as any)[p.key]}
+                    onChange={(e) => setSocialLinks(prev => ({ ...prev, [p.key]: e.target.value }))}
+                    placeholder={`${p.prefix}username`}
+                    className="h-8 rounded-lg bg-secondary border-0 text-xs text-foreground"
+                  />
+                </div>
+              ))}
+              <Button size="sm" onClick={saveSocial} className="w-full rounded-xl text-xs h-8 mt-2">Speichern</Button>
+            </div>
+          ) : hasSocialLinks ? (
+            <div className="flex flex-wrap gap-2">
+              {socialPlatforms.map(p => {
+                const val = (profile as any)?.[p.key];
+                if (!val) return null;
+                return (
+                  <span key={p.key} className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground">
+                    {p.label}: {val}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Keine Social Links hinterlegt</p>
+          )}
+        </div>
+
+        {/* Theme Switcher */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <p className="text-sm font-medium text-foreground">Design</p>
+          <div className="flex gap-2">
+            {[
+              { value: "light" as const, label: "Light", icon: Sun },
+              { value: "dark" as const, label: "Dark", icon: Moon },
+              { value: "sand" as const, label: "Sand", icon: Mountain },
+            ].map(({ value, label, icon: Icon }) => (
+              <button key={value} onClick={() => setTheme(value)}
+                className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-medium transition-colors ${
+                  theme === value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"
+                }`}>
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Completed Todos History */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
@@ -252,17 +331,12 @@ const Profile = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {c.todo_labels && (
-                              <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.todo_labels.color }} />
-                            )}
                             <span className="text-xs font-medium text-foreground truncate">{c.title}</span>
                             {c.recurrence && c.recurrence !== "none" && (
                               <span className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">{recurrenceLabel(c.recurrence)}</span>
                             )}
                           </div>
-                          {c.description && (
-                            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{c.description}</p>
-                          )}
+                          {c.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{c.description}</p>}
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {format(new Date(c.completed_at), "dd. MMM yyyy, HH:mm", { locale: de })}
                           </p>
@@ -281,27 +355,13 @@ const Profile = () => {
           <p className="text-sm font-medium text-foreground">Datenschutz</p>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {profile?.is_private ? (
-                <Lock className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Globe className="h-4 w-4 text-muted-foreground" />
-              )}
+              {profile?.is_private ? <Lock className="h-4 w-4 text-muted-foreground" /> : <Globe className="h-4 w-4 text-muted-foreground" />}
               <div>
-                <p className="text-sm text-foreground">
-                  {profile?.is_private ? "Privates Konto" : "Öffentliches Konto"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {profile?.is_private
-                    ? "Nur Freunde können deine Beiträge sehen"
-                    : "Jeder kann deine Beiträge sehen"}
-                </p>
+                <p className="text-sm text-foreground">{profile?.is_private ? "Privates Konto" : "Öffentliches Konto"}</p>
+                <p className="text-xs text-muted-foreground">{profile?.is_private ? "Nur Freunde können deine Beiträge sehen" : "Jeder kann deine Beiträge sehen"}</p>
               </div>
             </div>
-            <Switch
-              checked={profile?.is_private ?? false}
-              onCheckedChange={togglePrivacy}
-              disabled={savingPrivacy}
-            />
+            <Switch checked={profile?.is_private ?? false} onCheckedChange={togglePrivacy} disabled={savingPrivacy} />
           </div>
         </div>
 
@@ -311,28 +371,13 @@ const Profile = () => {
             <p className="text-sm font-medium text-foreground">Passwort</p>
             <Dialog open={showPassword} onOpenChange={setShowPassword}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="rounded-xl text-xs h-8">
-                  <Key className="h-3 w-3 mr-1" /> Ändern
-                </Button>
+                <Button variant="outline" size="sm" className="rounded-xl text-xs h-8"><Key className="h-3 w-3 mr-1" /> Ändern</Button>
               </DialogTrigger>
               <DialogContent className="rounded-2xl">
                 <DialogHeader><DialogTitle>Passwort ändern</DialogTitle></DialogHeader>
                 <div className="space-y-4">
-                  <Input
-                    type="password"
-                    placeholder="Neues Passwort"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    minLength={6}
-                    className="h-12 rounded-xl bg-secondary border-0 text-foreground"
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Passwort bestätigen"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-12 rounded-xl bg-secondary border-0 text-foreground"
-                  />
+                  <Input type="password" placeholder="Neues Passwort" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  <Input type="password" placeholder="Passwort bestätigen" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                   <Button onClick={handlePasswordChange} className="w-full h-12 rounded-xl" disabled={changingPassword || !newPassword || !confirmPassword}>
                     {changingPassword ? "..." : "Passwort ändern"}
                   </Button>
@@ -354,22 +399,16 @@ const Profile = () => {
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <p className="text-sm font-medium text-destructive">Konto löschen</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Dein Konto und alle zugehörigen Daten werden unwiderruflich gelöscht.
-          </p>
-          <Button
-            variant="destructive"
-            className="w-full rounded-xl"
-            onClick={async () => {
-              if (!confirm("Bist du sicher? Dein Konto und alle Daten werden unwiderruflich gelöscht.")) return;
-              if (!confirm("Letzte Warnung: Diese Aktion kann NICHT rückgängig gemacht werden. Fortfahren?")) return;
-              await supabase.from("todos").delete().eq("user_id", user!.id);
-              await supabase.from("posts").delete().eq("user_id", user!.id);
-              await supabase.from("profiles").delete().eq("user_id", user!.id);
-              await signOut();
-              toast({ title: "Konto gelöscht. Auf Wiedersehen 👋" });
-            }}
-          >
+          <p className="text-xs text-muted-foreground">Dein Konto und alle zugehörigen Daten werden unwiderruflich gelöscht.</p>
+          <Button variant="destructive" className="w-full rounded-xl" onClick={async () => {
+            if (!confirm("Bist du sicher? Dein Konto und alle Daten werden unwiderruflich gelöscht.")) return;
+            if (!confirm("Letzte Warnung: Diese Aktion kann NICHT rückgängig gemacht werden. Fortfahren?")) return;
+            await supabase.from("todos").delete().eq("user_id", user!.id);
+            await supabase.from("posts").delete().eq("user_id", user!.id);
+            await supabase.from("profiles").delete().eq("user_id", user!.id);
+            await signOut();
+            toast({ title: "Konto gelöscht. Auf Wiedersehen 👋" });
+          }}>
             <Trash2 className="h-4 w-4 mr-1" /> Konto unwiderruflich löschen
           </Button>
         </div>
