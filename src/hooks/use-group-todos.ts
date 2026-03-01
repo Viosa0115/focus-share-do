@@ -23,12 +23,16 @@ export function useCreateGroupTodo(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ title, completionType, dueDate, dueTime, recurrence }: {
+    mutationFn: async ({ title, completionType, dueDate, dueTime, recurrence, description, labelName, labelColor, assignedTo }: {
       title: string;
       completionType: "single" | "all";
       dueDate?: string;
       dueTime?: string;
       recurrence?: string;
+      description?: string;
+      labelName?: string;
+      labelColor?: string;
+      assignedTo?: string[];
     }) => {
       const { data: createdTodo, error } = await supabase
         .from("group_todos")
@@ -40,7 +44,11 @@ export function useCreateGroupTodo(groupId: string | undefined) {
           due_date: dueDate || null,
           due_time: dueTime || null,
           recurrence: recurrence || null,
-        })
+          description: description || null,
+          label_name: labelName || null,
+          label_color: labelColor || null,
+          assigned_to: assignedTo || [],
+        } as any)
         .select("id, title")
         .single();
       if (error) throw error;

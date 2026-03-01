@@ -314,14 +314,19 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
   const [title, setTitle] = useState("");
+  const [todoDesc, setTodoDesc] = useState("");
   const [completionType, setCompletionType] = useState<"single" | "all">("single");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [recurrence, setRecurrence] = useState("");
+  const [labelName, setLabelName] = useState("");
+  const [labelColor, setLabelColor] = useState("#6366f1");
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [listName, setListName] = useState("");
   const [listDesc, setListDesc] = useState("");
   const [activeList, setActiveList] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"todos" | "lists">("todos");
+  const COLORS = ["#6366f1", "#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#ec4899", "#8b5cf6", "#14b8a6"];
 
   const getDisplayName = (userId: string) => {
     const member = members.find((m: any) => m.user_id === userId);
@@ -360,10 +365,47 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
                   <DialogHeader><DialogTitle>Neue Aufgabe</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => {
                     e.preventDefault();
-                    createTodo.mutate({ title, completionType, dueDate: dueDate || undefined, dueTime: dueTime || undefined, recurrence: recurrence || undefined });
-                    setTitle(""); setDueDate(""); setDueTime(""); setRecurrence(""); setShowCreate(false);
+                    createTodo.mutate({
+                      title, completionType, dueDate: dueDate || undefined, dueTime: dueTime || undefined,
+                      recurrence: recurrence || undefined, description: todoDesc || undefined,
+                      labelName: labelName || undefined, labelColor: labelName ? labelColor : undefined,
+                      assignedTo: assignedTo.length > 0 ? assignedTo : undefined,
+                    });
+                    setTitle(""); setTodoDesc(""); setDueDate(""); setDueTime(""); setRecurrence("");
+                    setLabelName(""); setAssignedTo([]); setShowCreate(false);
                   }} className="space-y-4">
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Aufgabe..." required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                    <Textarea value={todoDesc} onChange={(e) => setTodoDesc(e.target.value)} placeholder="Beschreibung (optional)" className="rounded-xl bg-secondary border-0 text-xs text-foreground resize-none" rows={2} />
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Label (optional)</label>
+                      <Input value={labelName} onChange={(e) => setLabelName(e.target.value)} placeholder="Label Name" className="h-9 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+                      {labelName && (
+                        <div className="flex gap-1.5 flex-wrap">
+                          {COLORS.map(c => (
+                            <button key={c} type="button" onClick={() => setLabelColor(c)}
+                              className={`h-6 w-6 rounded-full transition-transform ${labelColor === c ? "scale-125 ring-2 ring-offset-1 ring-foreground" : ""}`}
+                              style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Zuweisen an</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(members as any[]).map((m: any) => {
+                          const uid = m.user_id;
+                          const name = (m as any).profiles?.display_name || "Nutzer";
+                          const selected = assignedTo.includes(uid);
+                          return (
+                            <button key={uid} type="button"
+                              onClick={() => setAssignedTo(prev => selected ? prev.filter(id => id !== uid) : [...prev, uid])}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${selected ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                              {name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-xs text-muted-foreground">Erledigung</label>
                       <div className="flex gap-2">
@@ -420,12 +462,24 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
                         {myCompletion && <CheckSquare className="h-3 w-3 text-primary-foreground" />}
                       </button>
                       <div className="flex-1">
-                        <span className={`text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.title}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2">
+                          {todo.label_color && <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: todo.label_color }} />}
+                          <span className={`text-sm ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.title}</span>
+                        </div>
+                        {todo.label_name && <span className="text-[9px] text-muted-foreground">{todo.label_name}</span>}
+                        {todo.description && <p className="text-[10px] text-muted-foreground mt-0.5">{todo.description}</p>}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-[10px] text-muted-foreground">{completedCount}/{todo.completion_type === "all" ? totalMembers : 1} erledigt</p>
                           {todo.due_date && <p className="text-[10px] text-muted-foreground">📅 {format(new Date(todo.due_date), "dd.MM.")}{todo.due_time && ` ${todo.due_time.slice(0, 5)}`}</p>}
                           {todo.recurrence && <p className="text-[10px] text-muted-foreground">🔄 {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}</p>}
                         </div>
+                        {(todo.assigned_to as string[] || []).length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(todo.assigned_to as string[]).map((uid: string) => (
+                              <span key={uid} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">👤 {getDisplayName(uid)}</span>
+                            ))}
+                          </div>
+                        )}
                         {todo.completion_type === "all" && completions.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {completions.map((c: any) => (

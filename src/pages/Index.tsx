@@ -1,6 +1,9 @@
+import { useState } from "react";
 import TodoList from "@/components/TodoList";
 import BottomNav from "@/components/BottomNav";
 import { useProfile } from "@/hooks/use-profile";
+import { TodoCalendar } from "@/components/TodoCalendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   const { data: profile } = useProfile();
@@ -32,10 +35,19 @@ const Index = () => {
 
       {/* Content */}
       <div className="max-w-lg mx-auto px-5 py-6 space-y-6">
-        <TodoList />
+        <Tabs defaultValue="todos">
+          <TabsList className="w-full rounded-xl">
+            <TabsTrigger value="todos" className="flex-1 rounded-lg text-xs">Aufgaben</TabsTrigger>
+            <TabsTrigger value="calendar" className="flex-1 rounded-lg text-xs">Kalender</TabsTrigger>
+          </TabsList>
+          <TabsContent value="todos" className="mt-4">
+            <TodoList />
+          </TabsContent>
+          <TabsContent value="calendar" className="mt-4">
+            <TodoCalendar />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <BottomNav />
     </div>
   );
 };

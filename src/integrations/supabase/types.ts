@@ -713,6 +713,7 @@ export type Database = {
       }
       group_todos: {
         Row: {
+          assigned_to: string[] | null
           completion_type: string
           created_at: string
           created_by: string
@@ -721,10 +722,13 @@ export type Database = {
           due_time: string | null
           group_id: string
           id: string
+          label_color: string | null
+          label_name: string | null
           recurrence: string | null
           title: string
         }
         Insert: {
+          assigned_to?: string[] | null
           completion_type?: string
           created_at?: string
           created_by: string
@@ -733,10 +737,13 @@ export type Database = {
           due_time?: string | null
           group_id: string
           id?: string
+          label_color?: string | null
+          label_name?: string | null
           recurrence?: string | null
           title: string
         }
         Update: {
+          assigned_to?: string[] | null
           completion_type?: string
           created_at?: string
           created_by?: string
@@ -745,6 +752,8 @@ export type Database = {
           due_time?: string | null
           group_id?: string
           id?: string
+          label_color?: string | null
+          label_name?: string | null
           recurrence?: string | null
           title?: string
         }
