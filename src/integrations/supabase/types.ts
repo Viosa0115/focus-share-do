@@ -55,6 +55,27 @@ export type Database = {
           },
         ]
       }
+      blocked_users: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       challenge_participants: {
         Row: {
           best_time_ms: number | null
@@ -292,35 +313,47 @@ export type Database = {
       }
       direct_todos: {
         Row: {
+          add_to_calendar: boolean
           completed_by: string[] | null
           created_at: string
           created_by: string
           description: string | null
           due_date: string | null
+          due_time: string | null
           friendship_id: string
           id: string
+          label_color: string | null
+          label_name: string | null
           recurrence: string | null
           title: string
         }
         Insert: {
+          add_to_calendar?: boolean
           completed_by?: string[] | null
           created_at?: string
           created_by: string
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           friendship_id: string
           id?: string
+          label_color?: string | null
+          label_name?: string | null
           recurrence?: string | null
           title: string
         }
         Update: {
+          add_to_calendar?: boolean
           completed_by?: string[] | null
           created_at?: string
           created_by?: string
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           friendship_id?: string
           id?: string
+          label_color?: string | null
+          label_name?: string | null
           recurrence?: string | null
           title?: string
         }
@@ -971,6 +1004,7 @@ export type Database = {
           id: string
           likes: boolean
           push_enabled: boolean
+          read_receipts: boolean
           todos: boolean
           user_id: string
         }
@@ -984,6 +1018,7 @@ export type Database = {
           id?: string
           likes?: boolean
           push_enabled?: boolean
+          read_receipts?: boolean
           todos?: boolean
           user_id: string
         }
@@ -997,6 +1032,7 @@ export type Database = {
           id?: string
           likes?: boolean
           push_enabled?: boolean
+          read_receipts?: boolean
           todos?: boolean
           user_id?: string
         }

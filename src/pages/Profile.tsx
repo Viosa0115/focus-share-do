@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText, Heart as HeartIcon } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText, Heart as HeartIcon, Ban } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { useTodoCompletions } from "@/hooks/use-todo-completions";
+import { useBlockedUsers, useUnblockUser } from "@/hooks/use-blocked-users";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ const Profile = () => {
   const { user, signOut } = useAuth();
   const { data: profile } = useProfile();
   const { data: completions = [] } = useTodoCompletions();
+  const { data: blockedUsers = [] } = useBlockedUsers();
+  const unblockUser = useUnblockUser();
   const { toast } = useToast();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -72,7 +75,6 @@ const Profile = () => {
   };
 
   const saveSocial = async () => {
-    // Count newly added social links for aura
     const oldLinks = { instagram: (profile as any)?.instagram || "", tiktok: (profile as any)?.tiktok || "", pinterest: (profile as any)?.pinterest || "", spotify: (profile as any)?.spotify || "", snapchat: (profile as any)?.snapchat || "" };
     let newLinkCount = 0;
     for (const key of Object.keys(socialLinks) as (keyof typeof socialLinks)[]) {
@@ -296,6 +298,36 @@ const Profile = () => {
             <Switch checked={profile?.is_private ?? false} onCheckedChange={togglePrivacy} disabled={savingPrivacy} />
           </div>
         </div>
+
+        {/* Blocked Users */}
+        {(blockedUsers as any[]).length > 0 && (
+          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+            <div className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Blockierte Nutzer</p>
+            </div>
+            <div className="space-y-2">
+              {(blockedUsers as any[]).map((b: any) => (
+                <div key={b.id} className="flex items-center justify-between p-2.5 rounded-xl bg-secondary">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {b.profile?.avatar_url ? (
+                        <img src={b.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-semibold text-muted-foreground">{(b.profile?.display_name || "?").charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <span className="text-sm text-foreground">{b.profile?.display_name || "Unbekannt"}</span>
+                  </div>
+                  <Button size="sm" variant="outline" className="rounded-xl text-xs h-7"
+                    onClick={() => unblockUser.mutate(b.blocked_id)}>
+                    Entblocken
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Privacy & Terms Link */}
         <button onClick={() => navigate("/privacy")} className="w-full p-4 rounded-2xl bg-card shadow-soft flex items-center gap-3 text-left hover:bg-accent/50 transition-colors">

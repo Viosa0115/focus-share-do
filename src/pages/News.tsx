@@ -70,7 +70,6 @@ const News = () => {
     enabled: !!user,
   });
 
-  // Filter expired posts
   const now = new Date();
   const activePosts = (posts as any[]).filter((p: any) => {
     if (!p.expires_at) return true;
@@ -83,7 +82,6 @@ const News = () => {
   const { data: todayRespect = [] } = useRespectPoints();
   const hasGivenRespectToday = (todayRespect as any[]).length > 0;
 
-  // Merge notifications + activities for the activity tab
   const mergedItems = [
     ...(notifications as any[]).map((n: any) => ({ ...n, _source: "notification" as const })),
     ...(activities as any[]).map((a: any) => ({
@@ -95,6 +93,12 @@ const News = () => {
 
   const handleNotificationClick = (item: any) => {
     if (item._source === "notification" && !item.read) markRead.mutate(item.id);
+
+    // If it's a post interaction notification, navigate to the post in the feed
+    if (item.reference_type === "post" && item.reference_id) {
+      // Stay on feed tab - scroll is not easily achievable, but marking read is done
+      return;
+    }
 
     const referenceType = item.reference_type || item.type;
     const tabByType: Record<string, string> = {
@@ -111,6 +115,14 @@ const News = () => {
       if (item.reference_id) params.set("ref", item.reference_id);
       const query = params.toString();
       navigate(query ? `/groups/${item.group_id}?${query}` : `/groups/${item.group_id}`);
+    }
+  };
+
+  const handleNameClick = (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    if (item.from_user_id) {
+      // Find friendship with this user
+      navigate(`/news`); // For now stay, could navigate to profile
     }
   };
 
@@ -209,6 +221,7 @@ const News = () => {
                   { key: "challenges", label: "Challenges" },
                   { key: "chat_messages", label: "Chatnachrichten" },
                   { key: "flashbacks", label: "Flashbacks" },
+                  { key: "read_receipts", label: "Lesebestätigungen" },
                 ].map(({ key, label }) => (
                   <div key={key} className="flex items-center justify-between">
                     <span className="text-xs text-foreground">{label}</span>
@@ -241,7 +254,9 @@ const News = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{item.title}</p>
                       {item.from_user_name && (
-                        <p className="text-[10px] text-primary mt-0.5">👤 von {item.from_user_name}</p>
+                        <button onClick={(e) => handleNameClick(e, item)} className="text-[10px] text-primary mt-0.5 hover:underline">
+                          👤 von {item.from_user_name}
+                        </button>
                       )}
                       {item.body && <p className="text-xs text-muted-foreground mt-0.5">{item.body}</p>}
                       {item.group_name && (

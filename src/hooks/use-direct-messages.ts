@@ -15,6 +15,9 @@ export function useDirectMessages(friendshipId: string | undefined) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages", filter: `friendship_id=eq.${friendshipId}` },
         () => qc.invalidateQueries({ queryKey: ["direct-messages", friendshipId] })
       )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "direct_messages", filter: `friendship_id=eq.${friendshipId}` },
+        () => qc.invalidateQueries({ queryKey: ["direct-messages", friendshipId] })
+      )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [friendshipId, qc]);
@@ -73,13 +76,26 @@ export function useCreateDirectTodo(friendshipId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { title: string; description?: string }) => {
+    mutationFn: async (params: {
+      title: string;
+      description?: string;
+      due_date?: string;
+      due_time?: string;
+      label_name?: string;
+      label_color?: string;
+      add_to_calendar?: boolean;
+    }) => {
       const { error } = await supabase.from("direct_todos").insert({
         friendship_id: friendshipId!,
         created_by: user!.id,
         title: params.title,
         description: params.description || "",
-      });
+        due_date: params.due_date || null,
+        due_time: params.due_time || null,
+        label_name: params.label_name || null,
+        label_color: params.label_color || null,
+        add_to_calendar: params.add_to_calendar || false,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["direct-todos", friendshipId] }),
@@ -145,7 +161,6 @@ export function useUpdateDirectChallengeScore(friendshipId: string | undefined) 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ challengeId, field, delta }: { challengeId: string; field: "score_creator" | "score_friend"; delta: number }) => {
-      // Get current
       const { data: ch } = await supabase.from("direct_challenges").select("*").eq("id", challengeId).single();
       if (!ch) throw new Error("Not found");
       const current = (ch as any)[field] || 0;

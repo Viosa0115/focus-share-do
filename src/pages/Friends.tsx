@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus, Check, X, Users as UsersIcon, MessageCircle, Share2, BookUser } from "lucide-react";
+import { UserPlus, Check, X, Users as UsersIcon, MessageCircle, Share2, BookUser, Sparkles } from "lucide-react";
 import { useFriends, useFriendRequests, useSendFriendRequest, useRespondFriendRequest } from "@/hooks/use-friends";
 import { useAllChatStreaks } from "@/hooks/use-chat-streaks";
 import { useFriendLastMessages, useUnreadDMCountPerFriend } from "@/hooks/use-friend-last-messages";
+import { useFriendSuggestions } from "@/hooks/use-friend-suggestions";
 import { StreakBadge } from "@/components/StreakBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const Friends = () => {
   const { data: friends = [] } = useFriends();
   const { data: requests = [] } = useFriendRequests();
   const { data: allStreaks = [] } = useAllChatStreaks();
+  const { data: suggestions = [] } = useFriendSuggestions();
   const sendRequest = useSendFriendRequest();
   const respondRequest = useRespondFriendRequest();
   const [showAdd, setShowAdd] = useState(false);
@@ -42,7 +44,6 @@ const Friends = () => {
   const { data: lastMessages = {} } = useFriendLastMessages(friendshipIds);
   const { data: unreadCounts = {} } = useUnreadDMCountPerFriend(friendshipIds);
 
-  // Sort by last message time (most recent first)
   const sortedFriends = [...acceptedFriends].sort((a: any, b: any) => {
     const aMsg = (lastMessages as any)[a.id];
     const bMsg = (lastMessages as any)[b.id];
@@ -70,6 +71,15 @@ const Friends = () => {
     }
   };
 
+  const handleSendSuggestionRequest = async (hashtagCode: string) => {
+    try {
+      await sendRequest.mutateAsync(hashtagCode);
+      toast({ title: "Anfrage gesendet! 📨" });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -81,7 +91,7 @@ const Friends = () => {
                 <UserPlus className="h-4 w-4 mr-1" /> Hinzufügen
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-2xl">
+            <DialogContent className="rounded-2xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Freund hinzufügen</DialogTitle></DialogHeader>
               <form onSubmit={handleAdd} className="space-y-4">
                 <Input
@@ -105,6 +115,37 @@ const Friends = () => {
                   </Button>
                 </div>
               </form>
+
+              {/* Friend Suggestions */}
+              {(suggestions as any[]).length > 0 && (
+                <div className="border-t border-border pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">Vorschläge</p>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {(suggestions as any[]).map((s: any) => (
+                      <div key={s.user_id} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50">
+                        <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {s.avatar_url ? (
+                            <img src={s.avatar_url} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-xs font-semibold text-secondary-foreground">{(s.display_name || "?").charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{s.display_name}</p>
+                          <p className="text-[10px] text-muted-foreground">✨ {s.aura || 0} Aura</p>
+                        </div>
+                        <Button size="sm" variant="outline" className="rounded-xl text-xs h-7 px-2"
+                          onClick={() => handleSendSuggestionRequest(s.hashtag_code)}>
+                          <UserPlus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -133,7 +174,7 @@ const Friends = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => respondRequest.mutate({ id: req.id, accept: true })}
-                      className="h-8 w-8 rounded-full bg-success flex items-center justify-center text-success-foreground"
+                      className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground"
                     >
                       <Check className="h-4 w-4" />
                     </button>

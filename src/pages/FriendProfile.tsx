@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Instagram, ExternalLink } from "lucide-react";
-import { useFriends } from "@/hooks/use-friends";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Instagram, ExternalLink, UserPlus, UserMinus, Ban } from "lucide-react";
+import { useFriends, useSendFriendRequest } from "@/hooks/use-friends";
+import { useBlockUser } from "@/hooks/use-blocked-users";
+import { useAuth } from "@/lib/auth-context";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const FriendProfile = () => {
   const { id: friendshipId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const { data: friends = [] } = useFriends();
+  const blockUser = useBlockUser();
 
   const friendship = (friends as any[]).find((f: any) => f.id === friendshipId);
   const friendProfile = friendship?.friend_profile;
@@ -28,6 +37,27 @@ const FriendProfile = () => {
   });
 
   const profile = fullProfile || friendProfile;
+
+  const handleRemoveFriend = async () => {
+    if (!confirm("Freund wirklich entfernen?")) return;
+    // Delete the friendship (user can delete if they are requester or addressee - using update to rejected)
+    await supabase.from("friendships").update({ status: "removed" } as any).eq("id", friendshipId!);
+    qc.invalidateQueries({ queryKey: ["friends"] });
+    toast({ title: "Freund entfernt" });
+    navigate("/friends");
+  };
+
+  const handleBlock = async () => {
+    if (!confirm("Nutzer wirklich blockieren? Du wirst keine Nachrichten mehr erhalten.")) return;
+    if (friendUserId) {
+      blockUser.mutate(friendUserId);
+      // Also remove friendship
+      await supabase.from("friendships").update({ status: "blocked" } as any).eq("id", friendshipId!);
+      qc.invalidateQueries({ queryKey: ["friends"] });
+      toast({ title: "Nutzer blockiert 🚫" });
+      navigate("/friends");
+    }
+  };
 
   const socialPlatforms = [
     { key: "instagram", label: "Instagram", prefix: "@", urlBase: "https://instagram.com/" },
@@ -70,6 +100,16 @@ const FriendProfile = () => {
             )}
             {profile?.bio && <p className="text-sm text-muted-foreground mt-2">{profile.bio}</p>}
           </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1 rounded-xl text-xs h-10" onClick={handleRemoveFriend}>
+            <UserMinus className="h-3.5 w-3.5 mr-1" /> Entfernen
+          </Button>
+          <Button variant="destructive" className="flex-1 rounded-xl text-xs h-10" onClick={handleBlock}>
+            <Ban className="h-3.5 w-3.5 mr-1" /> Blockieren
+          </Button>
         </div>
 
         {/* Social Links */}

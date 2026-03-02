@@ -10,7 +10,6 @@ export function useFriendLastMessages(friendshipIds: string[]) {
       if (!friendshipIds.length) return {};
       const result: Record<string, { content: string; created_at: string; sender_id: string }> = {};
       
-      // Fetch last message for each friendship
       await Promise.all(
         friendshipIds.map(async (fid) => {
           const { data } = await supabase
@@ -37,10 +36,10 @@ export function useUnreadDMCountPerFriend(friendshipIds: string[]) {
     queryFn: async () => {
       if (!friendshipIds.length) return {};
       const result: Record<string, number> = {};
-      const lastSeen = localStorage.getItem(`dm_last_seen_${user!.id}`) || "1970-01-01T00:00:00.000Z";
       
       await Promise.all(
         friendshipIds.map(async (fid) => {
+          const lastSeen = localStorage.getItem(`dm_seen_${user!.id}_${fid}`) || "1970-01-01T00:00:00.000Z";
           const { count } = await supabase
             .from("direct_messages")
             .select("*", { count: "exact", head: true })

@@ -7,14 +7,25 @@ export function useUnreadDMCount() {
   return useQuery({
     queryKey: ["unread-dm-count", user?.id],
     queryFn: async () => {
-      const lastSeen = localStorage.getItem(`dm_last_seen_${user!.id}`) || "1970-01-01T00:00:00.000Z";
-      const { count, error } = await supabase
-        .from("direct_messages")
-        .select("*", { count: "exact", head: true })
-        .neq("sender_id", user!.id)
-        .gt("created_at", lastSeen);
-      if (error) return 0;
-      return count || 0;
+      // Get all friendships
+      const { data: friendships } = await supabase
+        .from("friendships")
+        .select("id")
+        .eq("status", "accepted")
+        .or(`requester_id.eq.${user!.id},addressee_id.eq.${user!.id}`);
+      if (!friendships?.length) return 0;
+      let total = 0;
+      for (const f of friendships) {
+        const lastSeen = localStorage.getItem(`dm_seen_${user!.id}_${f.id}`) || "1970-01-01T00:00:00.000Z";
+        const { count } = await supabase
+          .from("direct_messages")
+          .select("*", { count: "exact", head: true })
+          .eq("friendship_id", f.id)
+          .neq("sender_id", user!.id)
+          .gt("created_at", lastSeen);
+        total += count || 0;
+      }
+      return total;
     },
     enabled: !!user,
     refetchInterval: 30000,
@@ -26,7 +37,6 @@ export function useUnreadGroupMessageCount() {
   return useQuery({
     queryKey: ["unread-group-msg-count", user?.id],
     queryFn: async () => {
-      // Sum up per-group unread counts
       const { data: memberships } = await supabase
         .from("group_members")
         .select("group_id")
@@ -77,14 +87,18 @@ export function useUnreadGroupCountPerGroup(groupIds: string[]) {
 }
 
 export function markDMsAsSeen(userId: string) {
+  // Legacy - kept for compatibility
   localStorage.setItem(`dm_last_seen_${userId}`, new Date().toISOString());
 }
 
 export function markGroupMessagesAsSeen(userId: string) {
-  // Legacy global - keep for bottom nav
   localStorage.setItem(`group_msg_last_seen_${userId}`, new Date().toISOString());
 }
 
 export function markGroupAsSeen(userId: string, groupId: string) {
   localStorage.setItem(`group_msg_seen_${userId}_${groupId}`, new Date().toISOString());
+}
+
+export function markDMFriendshipAsSeen(userId: string, friendshipId: string) {
+  localStorage.setItem(`dm_seen_${userId}_${friendshipId}`, new Date().toISOString());
 }
