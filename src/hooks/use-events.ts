@@ -23,10 +23,24 @@ export function useCreateEvent(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { name: string; description: string; event_date: string; start_time: string; end_time: string }) => {
+    mutationFn: async (params: {
+      name: string;
+      description: string;
+      event_date: string;
+      start_time: string;
+      end_time?: string;
+      location?: string;
+      location_url?: string;
+      avatar_url?: string;
+    }) => {
       const { data: createdEvent, error } = await supabase
         .from("group_events")
-        .insert({ ...params, group_id: groupId!, created_by: user!.id })
+        .insert({
+          ...params,
+          end_time: params.end_time || null,
+          group_id: groupId!,
+          created_by: user!.id,
+        } as any)
         .select("id, name")
         .single();
       if (error) throw error;

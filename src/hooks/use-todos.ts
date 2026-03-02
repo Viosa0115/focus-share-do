@@ -30,6 +30,7 @@ export function useCreateTodo() {
       due_time?: string;
       recurrence?: string;
       label_id?: string;
+      icon?: string;
     }) => {
       const { error } = await supabase
         .from("todos")
@@ -40,7 +41,8 @@ export function useCreateTodo() {
           due_date: payload.due_date || null,
           recurrence: payload.recurrence || null,
           label_id: payload.label_id || null,
-        });
+          icon: payload.icon || null,
+        } as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["todos"] }),
