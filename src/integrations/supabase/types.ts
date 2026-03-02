@@ -478,35 +478,44 @@ export type Database = {
       }
       group_events: {
         Row: {
+          avatar_url: string | null
           created_at: string
           created_by: string
           description: string | null
-          end_time: string
+          end_time: string | null
           event_date: string
           group_id: string
           id: string
+          location: string | null
+          location_url: string | null
           name: string
           start_time: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           created_by: string
           description?: string | null
-          end_time: string
+          end_time?: string | null
           event_date: string
           group_id: string
           id?: string
+          location?: string | null
+          location_url?: string | null
           name: string
           start_time: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
-          end_time?: string
+          end_time?: string | null
           event_date?: string
           group_id?: string
           id?: string
+          location?: string | null
+          location_url?: string | null
           name?: string
           start_time?: string
         }
@@ -896,6 +905,7 @@ export type Database = {
           due_date: string | null
           due_time: string | null
           group_id: string
+          icon: string | null
           id: string
           label_color: string | null
           label_name: string | null
@@ -911,6 +921,7 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           group_id: string
+          icon?: string | null
           id?: string
           label_color?: string | null
           label_name?: string | null
@@ -926,6 +937,7 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           group_id?: string
+          icon?: string | null
           id?: string
           label_color?: string | null
           label_name?: string | null
@@ -1617,6 +1629,7 @@ export type Database = {
           description: string | null
           due_date: string | null
           due_time: string | null
+          icon: string | null
           id: string
           label_id: string | null
           pinned: boolean
@@ -1631,6 +1644,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           due_time?: string | null
+          icon?: string | null
           id?: string
           label_id?: string | null
           pinned?: boolean
@@ -1645,6 +1659,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           due_time?: string | null
+          icon?: string | null
           id?: string
           label_id?: string | null
           pinned?: boolean

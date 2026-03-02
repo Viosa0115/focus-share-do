@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText, Heart as HeartIcon, Ban } from "lucide-react";
+import { LogOut, Copy, Edit2, Check, Lock, Globe, Camera, Key, Trash2, AlertTriangle, CheckSquare2, Sun, Moon, Mountain, Instagram, FileText, Heart as HeartIcon, Ban, Settings, ChevronRight, Sparkles, Languages } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/hooks/use-profile";
 import { useTodoCompletions } from "@/hooks/use-todo-completions";
 import { useBlockedUsers, useUnblockUser } from "@/hooks/use-blocked-users";
+import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/hooks/use-notification-preferences";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import { format } from "date-fns";
@@ -31,6 +32,8 @@ const Profile = () => {
   const { data: completions = [] } = useTodoCompletions();
   const { data: blockedUsers = [] } = useBlockedUsers();
   const unblockUser = useUnblockUser();
+  const { data: notifPrefs } = useNotificationPreferences();
+  const updatePrefs = useUpdateNotificationPreferences();
   const { toast } = useToast();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -57,6 +60,8 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAuraLeaderboard, setShowAuraLeaderboard] = useState(false);
 
   const [editingSocial, setEditingSocial] = useState(false);
   const [socialLinks, setSocialLinks] = useState({
@@ -141,14 +146,47 @@ const Profile = () => {
   ];
   const hasSocialLinks = socialPlatforms.some(p => (profile as any)?.[p.key]);
 
+  if (showAuraLeaderboard) {
+    return <AuraLeaderboard onBack={() => setShowAuraLeaderboard(false)} />;
+  }
+
+  if (showSettings) {
+    return (
+      <SettingsPage
+        onBack={() => setShowSettings(false)}
+        profile={profile}
+        notifPrefs={notifPrefs}
+        updatePrefs={updatePrefs}
+        theme={theme}
+        setTheme={setTheme}
+        blockedUsers={blockedUsers}
+        unblockUser={unblockUser}
+        togglePrivacy={togglePrivacy}
+        savingPrivacy={savingPrivacy}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        newPassword={newPassword}
+        setNewPassword={setNewPassword}
+        confirmPassword={confirmPassword}
+        setConfirmPassword={setConfirmPassword}
+        changingPassword={changingPassword}
+        handlePasswordChange={handlePasswordChange}
+        navigate={navigate}
+        user={user}
+        signOut={signOut}
+        toast={toast}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-lg mx-auto px-5 py-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-foreground">Profil</h1>
-          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground">
-            <LogOut className="h-4 w-4 mr-1" /> Abmelden
-          </Button>
+          <button onClick={() => setShowSettings(true)} className="text-muted-foreground hover:text-foreground">
+            <Settings className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
@@ -178,10 +216,10 @@ const Profile = () => {
           ) : (
             <div className="text-center space-y-1">
               <h2 className="text-lg font-semibold text-foreground">{profile?.display_name || "—"}</h2>
-              <div className="flex items-center justify-center gap-2">
+              <button onClick={() => setShowAuraLeaderboard(true)} className="flex items-center justify-center gap-2 mx-auto">
                 <span className="text-sm font-bold text-primary">✨ {aura} Aura</span>
                 {ranking && <span className="text-xs text-muted-foreground">#{ranking.rank} weltweit</span>}
-              </div>
+              </button>
               {profile?.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}
               <button onClick={startEdit} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2">
                 <Edit2 className="h-3 w-3" /> Bearbeiten
@@ -230,23 +268,6 @@ const Profile = () => {
           ) : <p className="text-xs text-muted-foreground">Keine Social Links hinterlegt</p>}
         </div>
 
-        {/* Theme Switcher */}
-        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
-          <p className="text-sm font-medium text-foreground">Design</p>
-          <div className="flex gap-2">
-            {[
-              { value: "light" as const, label: "Light", icon: Sun },
-              { value: "dark" as const, label: "Dark", icon: Moon },
-              { value: "sand" as const, label: "Sand", icon: Mountain },
-              { value: "pink" as const, label: "Pink", icon: HeartIcon },
-            ].map(({ value, label, icon: Icon }) => (
-              <button key={value} onClick={() => setTheme(value)} className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-medium transition-colors ${theme === value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
-                <Icon className="h-4 w-4" />{label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Completed Todos History */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
           <div className="flex items-center gap-2">
@@ -284,9 +305,105 @@ const Profile = () => {
           )}
         </div>
 
-        {/* Privacy Setting */}
+        {/* Saved Posts */}
+        {allDisplayPosts.length > 0 && (
+          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+            <p className="text-sm font-medium text-foreground">📌 Gespeicherte & eigene Beiträge</p>
+            <div className="space-y-4">
+              {allDisplayPosts.slice(0, 20).map((post: any) => {
+                const postProfile = post.profiles;
+                const isOwn = post.user_id === user?.id;
+                const likes = (allLikes as any[]).filter((l: any) => l.post_id === post.id);
+                const myLike = likes.find((l: any) => l.user_id === user?.id);
+                const respectCount = (allRespect as any[]).filter((r: any) => r.post_id === post.id).length;
+                return (
+                  <PostCard key={post.id} post={post} profile={postProfile || profile} isOwn={isOwn}
+                    likes={likes} myLike={!!myLike} respectCount={respectCount}
+                    hasGivenRespectToday={hasGivenRespectToday}
+                    onDelete={() => deletePost.mutate(post.id)}
+                    myDisplayName={profile?.display_name || ""} />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Email */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft">
+          <p className="text-xs text-muted-foreground">E-Mail</p>
+          <p className="text-sm text-foreground mt-1">{user?.email}</p>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+};
+
+/* ============ SETTINGS PAGE ============ */
+function SettingsPage({ onBack, profile, notifPrefs, updatePrefs, theme, setTheme, blockedUsers, unblockUser, togglePrivacy, savingPrivacy, showPassword, setShowPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword, changingPassword, handlePasswordChange, navigate, user, signOut, toast }: any) {
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-3">
+          <button onClick={onBack} className="text-muted-foreground hover:text-foreground">
+            <ChevronRight className="h-5 w-5 rotate-180" />
+          </button>
+          <h1 className="text-xl font-semibold text-foreground">Einstellungen</h1>
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-5 py-6 space-y-4">
+        {/* Design */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
-          <p className="text-sm font-medium text-foreground">Datenschutz</p>
+          <p className="text-sm font-medium text-foreground">🎨 App Design</p>
+          <div className="flex gap-2">
+            {[
+              { value: "light" as const, label: "Light", icon: Sun },
+              { value: "dark" as const, label: "Dark", icon: Moon },
+              { value: "sand" as const, label: "Sand", icon: Mountain },
+              { value: "pink" as const, label: "Pink", icon: HeartIcon },
+            ].map(({ value, label, icon: Icon }) => (
+              <button key={value} onClick={() => setTheme(value)} className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-medium transition-colors ${theme === value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
+                <Icon className="h-4 w-4" />{label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Read Receipts */}
+        {notifPrefs && (
+          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+            <p className="text-sm font-medium text-foreground">📩 Lesebestätigungen</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Andere können sehen, ob du Nachrichten gelesen hast</p>
+              <Switch checked={(notifPrefs as any)?.read_receipts ?? true} onCheckedChange={(val: boolean) => updatePrefs.mutate({ read_receipts: val })} />
+            </div>
+          </div>
+        )}
+
+        {/* Notification settings */}
+        {notifPrefs && (
+          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+            <p className="text-sm font-medium text-foreground">🔔 Benachrichtigungen</p>
+            {[
+              { key: "likes", label: "Likes & Respect" },
+              { key: "comments", label: "Kommentare" },
+              { key: "todos", label: "Aufgaben" },
+              { key: "events", label: "Events" },
+              { key: "challenges", label: "Challenges" },
+              { key: "chat_messages", label: "Chatnachrichten" },
+              { key: "flashbacks", label: "Flashbacks" },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between">
+                <span className="text-xs text-foreground">{label}</span>
+                <Switch checked={(notifPrefs as any)?.[key] ?? true} onCheckedChange={(val: boolean) => updatePrefs.mutate({ [key]: val })} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Privacy */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <p className="text-sm font-medium text-foreground">🔒 Datenschutz</p>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {profile?.is_private ? <Lock className="h-4 w-4 text-muted-foreground" /> : <Globe className="h-4 w-4 text-muted-foreground" />}
@@ -329,7 +446,7 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Privacy & Terms Link */}
+        {/* Privacy & Terms */}
         <button onClick={() => navigate("/privacy")} className="w-full p-4 rounded-2xl bg-card shadow-soft flex items-center gap-3 text-left hover:bg-accent/50 transition-colors">
           <FileText className="h-4 w-4 text-muted-foreground" />
           <div>
@@ -338,10 +455,10 @@ const Profile = () => {
           </div>
         </button>
 
-        {/* Password Change */}
+        {/* Password */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-foreground">Passwort</p>
+            <p className="text-sm font-medium text-foreground">🔑 Passwort</p>
             <Dialog open={showPassword} onOpenChange={setShowPassword}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="rounded-xl text-xs h-8"><Key className="h-3 w-3 mr-1" /> Ändern</Button>
@@ -349,8 +466,8 @@ const Profile = () => {
               <DialogContent className="rounded-2xl">
                 <DialogHeader><DialogTitle>Passwort ändern</DialogTitle></DialogHeader>
                 <div className="space-y-4">
-                  <Input type="password" placeholder="Neues Passwort" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
-                  <Input type="password" placeholder="Passwort bestätigen" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  <Input type="password" placeholder="Neues Passwort" value={newPassword} onChange={(e: any) => setNewPassword(e.target.value)} minLength={6} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  <Input type="password" placeholder="Passwort bestätigen" value={confirmPassword} onChange={(e: any) => setConfirmPassword(e.target.value)} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                   <Button onClick={handlePasswordChange} className="w-full h-12 rounded-xl" disabled={changingPassword || !newPassword || !confirmPassword}>
                     {changingPassword ? "..." : "Passwort ändern"}
                   </Button>
@@ -360,34 +477,10 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Saved Posts */}
-        {allDisplayPosts.length > 0 && (
-          <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
-            <p className="text-sm font-medium text-foreground">📌 Gespeicherte & eigene Beiträge</p>
-            <div className="space-y-4">
-              {allDisplayPosts.slice(0, 20).map((post: any) => {
-                const postProfile = post.profiles;
-                const isOwn = post.user_id === user?.id;
-                const likes = (allLikes as any[]).filter((l: any) => l.post_id === post.id);
-                const myLike = likes.find((l: any) => l.user_id === user?.id);
-                const respectCount = (allRespect as any[]).filter((r: any) => r.post_id === post.id).length;
-                return (
-                  <PostCard key={post.id} post={post} profile={postProfile || profile} isOwn={isOwn}
-                    likes={likes} myLike={!!myLike} respectCount={respectCount}
-                    hasGivenRespectToday={hasGivenRespectToday}
-                    onDelete={() => deletePost.mutate(post.id)}
-                    myDisplayName={profile?.display_name || ""} />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Email */}
-        <div className="p-4 rounded-2xl bg-card shadow-soft">
-          <p className="text-xs text-muted-foreground">E-Mail</p>
-          <p className="text-sm text-foreground mt-1">{user?.email}</p>
-        </div>
+        {/* Logout */}
+        <Button variant="outline" className="w-full rounded-xl" onClick={signOut}>
+          <LogOut className="h-4 w-4 mr-2" /> Abmelden
+        </Button>
 
         {/* Delete Account */}
         <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3 border border-destructive/20">
@@ -412,6 +505,89 @@ const Profile = () => {
       <BottomNav />
     </div>
   );
-};
+}
+
+/* ============ AURA LEADERBOARD ============ */
+function AuraLeaderboard({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth();
+  const { data: topUsers = [], isLoading } = useQuery({
+    queryKey: ["aura-top-100"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url, aura, is_private")
+        .order("aura", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-3">
+          <button onClick={onBack} className="text-muted-foreground hover:text-foreground">
+            <ChevronRight className="h-5 w-5 rotate-180" />
+          </button>
+          <h1 className="text-xl font-semibold text-foreground">✨ Aura</h1>
+        </div>
+      </div>
+      <div className="max-w-lg mx-auto px-5 py-6 space-y-6">
+        {/* Explanation */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <p className="text-sm font-semibold text-foreground">Was ist Aura?</p>
+          <p className="text-xs text-muted-foreground">Aura zeigt deine Aktivität in der App. Je mehr du interagierst, desto höher steigst du im globalen Ranking!</p>
+          <div className="space-y-1.5 text-xs text-foreground">
+            <p>💬 Nachricht senden: <span className="text-primary font-semibold">+1</span></p>
+            <p>❤️ Post liken: <span className="text-primary font-semibold">+1</span></p>
+            <p>💬 Post kommentieren: <span className="text-primary font-semibold">+10</span></p>
+            <p>🫡 Post respektieren: <span className="text-primary font-semibold">+25</span></p>
+            <p>📝 Todo posten: <span className="text-primary font-semibold">+2</span></p>
+            <p>👥 Gruppe erstellen: <span className="text-primary font-semibold">+3</span></p>
+            <p>📋 Gruppen-Inhalt erstellen: <span className="text-primary font-semibold">+2</span></p>
+            <p>🔗 Social-Media-Link: <span className="text-primary font-semibold">+10</span></p>
+            <p>🤝 Neuer Freund: <span className="text-primary font-semibold">+15</span></p>
+            <p>📨 Einladungs-Registrierung: <span className="text-primary font-semibold">+50</span></p>
+          </div>
+        </div>
+
+        {/* Leaderboard */}
+        <div className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
+          <p className="text-sm font-semibold text-foreground">🏆 Top 100 Weltweit</p>
+          {isLoading ? (
+            <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-10 rounded-xl bg-secondary animate-pulse" />)}</div>
+          ) : (
+            <div className="space-y-1.5">
+              {(topUsers as any[]).map((u: any, idx: number) => {
+                const isMe = u.user_id === user?.id;
+                const isPublic = !u.is_private;
+                return (
+                  <div key={u.user_id} className={`flex items-center gap-3 p-2.5 rounded-xl ${isMe ? "bg-primary/10" : "bg-secondary/50"}`}>
+                    <span className="text-xs font-bold text-muted-foreground w-7 text-right">
+                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                    </span>
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {isPublic && u.avatar_url ? (
+                        <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[9px] font-semibold text-muted-foreground">{isPublic ? (u.display_name || "?").charAt(0).toUpperCase() : "?"}</span>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-foreground flex-1 truncate">
+                      {isPublic || isMe ? u.display_name : "Privater Nutzer"}
+                    </span>
+                    <span className="text-xs font-bold text-primary">✨ {u.aura}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
 
 export default Profile;

@@ -4,10 +4,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useToggleLike, usePostComments, useAddComment, useGiveRespect } from "@/hooks/use-post-interactions";
 import { useCommentReplies, useAddReply } from "@/hooks/use-comment-replies";
-import { createNotification } from "@/hooks/use-notifications";
 import { useExtendPostLife } from "@/hooks/use-posts";
 import { useToggleSavePost, useMySavedPostIds } from "@/hooks/use-saved-posts";
 import { addAuraPoints } from "@/hooks/use-aura";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -24,6 +24,23 @@ interface PostCardProps {
   myDisplayName: string;
 }
 
+async function sendNotification(data: {
+  user_id: string;
+  type: string;
+  title: string;
+  body?: string;
+  from_user_id?: string;
+  from_user_name?: string;
+  reference_type?: string;
+  reference_id?: string;
+}) {
+  try {
+    await supabase.from("notifications").insert(data as any);
+  } catch (e) {
+    console.error("Notification error:", e);
+  }
+}
+
 function CommentReplySection({ comment, myDisplayName, postUserId }: { comment: any; myDisplayName: string; postUserId: string }) {
   const { user } = useAuth();
   const { data: replies = [] } = useCommentReplies(comment.id);
@@ -31,12 +48,12 @@ function CommentReplySection({ comment, myDisplayName, postUserId }: { comment: 
   const [replyText, setReplyText] = useState("");
   const [showReply, setShowReply] = useState(false);
 
-  const handleReply = (e: React.FormEvent) => {
+  const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim()) return;
     addReply.mutate({ commentId: comment.id, content: replyText.trim() });
     if (comment.user_id !== user?.id) {
-      createNotification({
+      await sendNotification({
         user_id: comment.user_id, type: "comment", title: "Antwort auf deinen Kommentar 💬",
         body: `${myDisplayName}: ${replyText.trim().substring(0, 50)}`,
         from_user_id: user!.id, from_user_name: myDisplayName,
@@ -113,13 +130,13 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
   const displayMeta = hasMeta ? metaLines : [];
   const displayContent = hasMeta ? thoughtLines.join("\n").trim() : post.content;
 
-  const handleLike = () => {
+  const handleLike = async () => {
     toggleLike.mutate({ postId: post.id, liked: myLike });
     if (!myLike) {
       extendLife.mutate({ postId: post.id, extraMs: 3600000 });
       if (user) addAuraPoints(user.id, 1);
       if (post.user_id !== user?.id) {
-        createNotification({
+        await sendNotification({
           user_id: post.user_id, type: "like", title: "Neuer Like ❤️",
           body: `${myDisplayName} hat deinen Beitrag geliked`,
           from_user_id: user!.id, from_user_name: myDisplayName,
@@ -129,15 +146,15 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
     }
   };
 
-  const handleComment = (e: React.FormEvent) => {
+  const handleComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
     addComment.mutate({ postId: post.id, content: commentText.trim() });
     if (user) addAuraPoints(user.id, 10);
     if (post.user_id !== user?.id) {
-      createNotification({
+      await sendNotification({
         user_id: post.user_id, type: "comment", title: "Neuer Kommentar 💬",
-        body: `${myDisplayName}: ${commentText.trim().substring(0, 50)}`,
+        body: `${myDisplayName}: "${commentText.trim().substring(0, 50)}"`,
         from_user_id: user!.id, from_user_name: myDisplayName,
         reference_type: "post", reference_id: post.id,
       });
@@ -145,13 +162,13 @@ export default function PostCard({ post, profile, isOwn, likes, myLike, respectC
     setCommentText("");
   };
 
-  const handleRespect = () => {
+  const handleRespect = async () => {
     if (hasGivenRespectToday) { toast({ title: "Du hast heute bereits Respect vergeben 🤝", variant: "destructive" }); return; }
     if (post.user_id === user?.id) { toast({ title: "Du kannst dir nicht selbst Respect geben", variant: "destructive" }); return; }
     giveRespect.mutate({ postId: post.id, toUserId: post.user_id });
     extendLife.mutate({ postId: post.id, extraMs: 48 * 3600000 });
     if (user) addAuraPoints(user.id, 25);
-    createNotification({
+    await sendNotification({
       user_id: post.user_id, type: "respect", title: "Respect erhalten! 🫡",
       body: `${myDisplayName} hat dir Respect gegeben`,
       from_user_id: user!.id, from_user_name: myDisplayName,

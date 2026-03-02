@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Plus, Trash2, Calendar, RefreshCw, ChevronDown, ChevronUp, Tag, FileText, Trophy, Minus, Play, Square, Flag, Save, X, Clock, Star, Award, Timer } from "lucide-react";
+import { Check, Plus, Trash2, Calendar, RefreshCw, ChevronDown, ChevronUp, Tag, FileText, Trophy, Minus, Play, Square, Flag, Save, X, Clock, Star, Award, Timer, Smile } from "lucide-react";
 import { useTodos, useCreateTodo, useToggleTodo, useDeleteTodo } from "@/hooks/use-todos";
 import { useTodoLabels, useCreateLabel, useDeleteLabel } from "@/hooks/use-todo-labels";
 import { usePersonalChallenges, useCreatePersonalChallenge, useUpdatePersonalChallenge, useDeletePersonalChallenge } from "@/hooks/use-personal-challenges";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { TodoCompletionPostDialog } from "@/components/TodoCompletionPostDialog";
+import { IconPicker } from "@/components/IconPicker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StreakBadge } from "@/components/StreakBadge";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +66,8 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   const [showLabelCreate, setShowLabelCreate] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0]);
+  const [icon, setIcon] = useState("");
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   const { data: todos = [], isLoading } = useTodos();
   const { data: labels = [] } = useTodoLabels();
@@ -87,13 +90,15 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
       due_time: dueTime || undefined,
       recurrence: recurrence !== "none" ? recurrence : undefined,
       label_id: labelId !== "none" ? labelId : undefined,
-    });
+      icon: icon || undefined,
+    } as any);
     setNewTodo("");
     setDescription("");
     setDueDate("");
     setDueTime("");
     setRecurrence("none");
     setLabelId("none");
+    setIcon("");
     setShowAdvanced(false);
   };
 
@@ -251,9 +256,17 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
                 </Select>
               </div>
             )}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground flex items-center gap-1"><Smile className="h-3 w-3" /> Icon</label>
+              <button type="button" onClick={() => setShowIconPicker(true)}
+                className="h-9 w-full rounded-lg bg-card border-0 text-xs text-foreground flex items-center px-3 gap-2">
+                {icon ? <span className="text-lg">{icon}</span> : <span className="text-muted-foreground">Kein Icon</span>}
+              </button>
+            </div>
           </div>
         )}
       </form>
+      <IconPicker open={showIconPicker} onClose={() => setShowIconPicker(false)} onSelect={setIcon} selected={icon} />
 
       {/* Todo sections */}
       {isLoading ? (
@@ -307,7 +320,8 @@ function TodoItem({ todo, label, streak, onToggle, onDelete }: { todo: any; labe
         </button>
         <div className="flex-1 min-w-0" onClick={() => todo.description && setExpanded(!expanded)}>
           <div className="flex items-center gap-2">
-            {label && <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />}
+            {todo.icon && <span className="text-sm flex-shrink-0">{todo.icon}</span>}
+            {label && !todo.icon && <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />}
             <span className={`text-sm transition-all duration-200 ${todo.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
               {todo.title}
             </span>

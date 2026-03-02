@@ -979,10 +979,16 @@ function EventsTab({ groupId, canEvents }: { groupId: string; canEvents: boolean
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [location, setLocation] = useState("");
+  const [locationUrl, setLocationUrl] = useState("");
 
   const getDisplayName = (userId: string) => {
     const member = members.find((m: any) => m.user_id === userId);
     return (member as any)?.profiles?.display_name || "Nutzer";
+  };
+  const getAvatar = (userId: string) => {
+    const member = members.find((m: any) => m.user_id === userId);
+    return (member as any)?.profiles?.avatar_url || null;
   };
 
   return (
@@ -994,21 +1000,29 @@ function EventsTab({ groupId, canEvents }: { groupId: string; canEvents: boolean
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="rounded-xl text-xs h-8"><Plus className="h-3 w-3 mr-1" /> Neu</Button>
             </DialogTrigger>
-            <DialogContent className="rounded-2xl">
+            <DialogContent className="rounded-2xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Neues Event</DialogTitle></DialogHeader>
               <form onSubmit={(e) => {
                 e.preventDefault();
-                createEvent.mutate({ name, description: desc, event_date: date, start_time: startTime, end_time: endTime });
-                setName(""); setDesc(""); setDate(""); setStartTime(""); setEndTime(""); setShowCreate(false);
+                createEvent.mutate({ name, description: desc, event_date: date, start_time: startTime, end_time: endTime || undefined, location: location || undefined, location_url: locationUrl || undefined });
+                setName(""); setDesc(""); setDate(""); setStartTime(""); setEndTime(""); setLocation(""); setLocationUrl(""); setShowCreate(false);
               }} className="space-y-3">
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Beschreibung" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <Input value={date} onChange={e => setDate(e.target.value)} type="date" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
                 <div className="flex gap-2">
-                  <Input value={startTime} onChange={e => setStartTime(e.target.value)} type="time" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
-                  <Input value={endTime} onChange={e => setEndTime(e.target.value)} type="time" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Startzeit *</label>
+                    <Input value={startTime} onChange={e => setStartTime(e.target.value)} type="time" required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Endzeit (optional)</label>
+                    <Input value={endTime} onChange={e => setEndTime(e.target.value)} type="time" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                  </div>
                 </div>
-                <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim() || !date || !startTime || !endTime}>Erstellen</Button>
+                <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="📍 Ort (optional)" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                <Input value={locationUrl} onChange={e => setLocationUrl(e.target.value)} placeholder="🔗 Google Maps Link (optional)" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+                <Button type="submit" className="w-full h-12 rounded-xl" disabled={!name.trim() || !date || !startTime}>Erstellen</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -1027,31 +1041,62 @@ function EventsTab({ groupId, canEvents }: { groupId: string; canEvents: boolean
             const rsvps = event.event_rsvps || [];
             const myRsvp = rsvps.find((r: any) => r.user_id === user?.id);
             const attendees = rsvps.filter((r: any) => r.status === "attending");
+            const declined = rsvps.filter((r: any) => r.status === "declined");
 
             return (
               <div key={event.id} className="p-4 rounded-2xl bg-card shadow-soft space-y-3">
                 <div>
                   <h4 className="font-medium text-sm text-foreground">{event.name}</h4>
                   {event.description && <p className="text-xs text-muted-foreground">{event.description}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">📅 {format(new Date(event.event_date), "dd. MMM yyyy", { locale: de })} · {event.start_time?.slice(0, 5)} – {event.end_time?.slice(0, 5)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    📅 {format(new Date(event.event_date), "dd. MMM yyyy", { locale: de })} · {event.start_time?.slice(0, 5)}
+                    {event.end_time && ` – ${event.end_time.slice(0, 5)}`}
+                  </p>
+                  {(event as any).location && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      📍 {(event as any).location_url ? (
+                        <a href={(event as any).location_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{(event as any).location}</a>
+                      ) : (event as any).location}
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-muted-foreground">{attendees.length} Zusagen</span>
-                    {attendees.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {attendees.map((r: any) => (
-                          <span key={r.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{getDisplayName(r.user_id)}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <div className="space-y-2">
                   <div className="flex gap-2">
                     <Button size="sm" variant={myRsvp?.status === "attending" ? "default" : "outline"} className="rounded-xl text-xs h-7"
-                      onClick={() => canEvents && rsvp.mutate({ eventId: event.id, status: "attending" })} disabled={!canEvents}>Zusagen</Button>
+                      onClick={() => canEvents && rsvp.mutate({ eventId: event.id, status: "attending" })} disabled={!canEvents}>
+                      ✅ Zusagen
+                    </Button>
                     <Button size="sm" variant={myRsvp?.status === "declined" ? "destructive" : "outline"} className="rounded-xl text-xs h-7"
-                      onClick={() => canEvents && rsvp.mutate({ eventId: event.id, status: "declined" })} disabled={!canEvents}>Absagen</Button>
+                      onClick={() => canEvents && rsvp.mutate({ eventId: event.id, status: "declined" })} disabled={!canEvents}>
+                      ❌ Absagen
+                    </Button>
                   </div>
+                  {attendees.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground mr-1">✅ {attendees.length}:</span>
+                      {attendees.map((r: any) => {
+                        const av = getAvatar(r.user_id);
+                        return (
+                          <div key={r.id} className="h-5 w-5 rounded-full bg-muted flex items-center justify-center overflow-hidden" title={getDisplayName(r.user_id)}>
+                            {av ? <img src={av} alt="" className="h-full w-full object-cover" /> : <span className="text-[7px] font-bold text-muted-foreground">{getDisplayName(r.user_id).charAt(0)}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {declined.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground mr-1">❌ {declined.length}:</span>
+                      {declined.map((r: any) => {
+                        const av = getAvatar(r.user_id);
+                        return (
+                          <div key={r.id} className="h-5 w-5 rounded-full bg-muted flex items-center justify-center overflow-hidden opacity-50" title={getDisplayName(r.user_id)}>
+                            {av ? <img src={av} alt="" className="h-full w-full object-cover" /> : <span className="text-[7px] font-bold text-muted-foreground">{getDisplayName(r.user_id).charAt(0)}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
