@@ -325,6 +325,7 @@ export type Database = {
           label_color: string | null
           label_name: string | null
           recurrence: string | null
+          reminder_at: string | null
           title: string
         }
         Insert: {
@@ -340,6 +341,7 @@ export type Database = {
           label_color?: string | null
           label_name?: string | null
           recurrence?: string | null
+          reminder_at?: string | null
           title: string
         }
         Update: {
@@ -355,6 +357,7 @@ export type Database = {
           label_color?: string | null
           label_name?: string | null
           recurrence?: string | null
+          reminder_at?: string | null
           title?: string
         }
         Relationships: [
@@ -910,6 +913,7 @@ export type Database = {
           label_color: string | null
           label_name: string | null
           recurrence: string | null
+          reminder_at: string | null
           title: string
         }
         Insert: {
@@ -926,6 +930,7 @@ export type Database = {
           label_color?: string | null
           label_name?: string | null
           recurrence?: string | null
+          reminder_at?: string | null
           title: string
         }
         Update: {
@@ -942,6 +947,7 @@ export type Database = {
           label_color?: string | null
           label_name?: string | null
           recurrence?: string | null
+          reminder_at?: string | null
           title?: string
         }
         Relationships: [
@@ -1634,6 +1640,7 @@ export type Database = {
           label_id: string | null
           pinned: boolean
           recurrence: string | null
+          reminder_at: string | null
           title: string
           updated_at: string
           user_id: string
@@ -1649,6 +1656,7 @@ export type Database = {
           label_id?: string | null
           pinned?: boolean
           recurrence?: string | null
+          reminder_at?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -1664,6 +1672,7 @@ export type Database = {
           label_id?: string | null
           pinned?: boolean
           recurrence?: string | null
+          reminder_at?: string | null
           title?: string
           updated_at?: string
           user_id?: string
