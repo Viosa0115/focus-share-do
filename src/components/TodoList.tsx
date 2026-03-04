@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Check, Plus, Trash2, Calendar, RefreshCw, ChevronDown, ChevronUp, Tag, FileText, Trophy, Minus, Play, Square, Flag, Save, X, Clock, Star, Award, Timer, Smile } from "lucide-react";
-import { useTodos, useCreateTodo, useToggleTodo, useDeleteTodo } from "@/hooks/use-todos";
+import { Check, Plus, Trash2, Calendar, RefreshCw, ChevronDown, ChevronUp, Tag, FileText, Trophy, Minus, Play, Square, Flag, Save, X, Clock, Star, Award, Timer, Smile, Pencil, Bell } from "lucide-react";
+import { useTodos, useCreateTodo, useToggleTodo, useDeleteTodo, useUpdateTodo, shouldResetRecurringTodo } from "@/hooks/use-todos";
 import { useTodoLabels, useCreateLabel, useDeleteLabel } from "@/hooks/use-todo-labels";
 import { usePersonalChallenges, useCreatePersonalChallenge, useUpdatePersonalChallenge, useDeletePersonalChallenge } from "@/hooks/use-personal-challenges";
 import { useTodoStreaks, useUpdateStreak } from "@/hooks/use-todo-streaks";
 import { useSaveTodoCompletion } from "@/hooks/use-todo-completions";
 import { useChallengeTimes, useSaveChallengeTime } from "@/hooks/use-personal-challenge-times";
+import { computeReminderAt } from "@/hooks/use-reminders";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,14 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 
 const LABEL_COLORS = ["#6366f1", "#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#ec4899", "#8b5cf6", "#14b8a6"];
+const REMINDER_OPTIONS = [
+  { value: "none", label: "Keine" },
+  { value: "10min", label: "10 Min vorher" },
+  { value: "1h", label: "1 Std vorher" },
+  { value: "3h", label: "3 Std vorher" },
+  { value: "6h", label: "6 Std vorher" },
+  { value: "1day", label: "1 Tag vorher" },
+];
 
 const TodoList = () => {
   const [completedTodo, setCompletedTodo] = useState<{ id: string; title: string; description?: string; streakCount?: number } | null>(null);
@@ -31,11 +40,9 @@ const TodoList = () => {
           <TabsTrigger value="todos" className="flex-1 rounded-lg text-xs">Aufgaben</TabsTrigger>
           <TabsTrigger value="challenges" className="flex-1 rounded-lg text-xs">Challenges</TabsTrigger>
         </TabsList>
-
         <TabsContent value="todos" className="mt-4">
           <TodosSection completedTodo={completedTodo} setCompletedTodo={setCompletedTodo} />
         </TabsContent>
-
         <TabsContent value="challenges" className="mt-4">
           <PersonalChallengesSection />
         </TabsContent>
@@ -68,6 +75,7 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0]);
   const [icon, setIcon] = useState("");
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [reminder, setReminder] = useState("none");
 
   const { data: todos = [], isLoading } = useTodos();
   const { data: labels = [] } = useTodoLabels();
@@ -75,14 +83,26 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   const createTodo = useCreateTodo();
   const toggleTodo = useToggleTodo();
   const deleteTodo = useDeleteTodo();
+  const updateTodo = useUpdateTodo();
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
   const updateStreak = useUpdateStreak();
   const saveTodoCompletion = useSaveTodoCompletion();
 
+  // Auto-reset recurring todos
+  useEffect(() => {
+    if (!todos || todos.length === 0) return;
+    (todos as any[]).forEach((todo: any) => {
+      if (shouldResetRecurringTodo(todo)) {
+        updateTodo.mutate({ id: todo.id, completed: false });
+      }
+    });
+  }, [todos]);
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
+    const reminderAt = dueDate && reminder !== "none" ? computeReminderAt(dueDate, dueTime, reminder) : undefined;
     createTodo.mutate({
       title: newTodo.trim(),
       description: description.trim() || undefined,
@@ -91,14 +111,10 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
       recurrence: recurrence !== "none" ? recurrence : undefined,
       label_id: labelId !== "none" ? labelId : undefined,
       icon: icon || undefined,
+      reminder_at: reminderAt || undefined,
     } as any);
-    setNewTodo("");
-    setDescription("");
-    setDueDate("");
-    setDueTime("");
-    setRecurrence("none");
-    setLabelId("none");
-    setIcon("");
+    setNewTodo(""); setDescription(""); setDueDate(""); setDueTime("");
+    setRecurrence("none"); setLabelId("none"); setIcon(""); setReminder("none");
     setShowAdvanced(false);
   };
 
@@ -107,21 +123,14 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
     toggleTodo.mutate({ id: todo.id, completed: nowCompleted });
     if (nowCompleted) {
       let streakCount = 0;
-      // Save completion to history
       saveTodoCompletion.mutate({
-        todo_id: todo.id,
-        title: todo.title,
-        description: todo.description,
-        recurrence: todo.recurrence,
-        label_id: todo.label_id,
+        todo_id: todo.id, title: todo.title, description: todo.description,
+        recurrence: todo.recurrence, label_id: todo.label_id,
       });
-      // Update streak for recurring todos
       if (todo.recurrence && todo.recurrence !== "none") {
         try {
           streakCount = await updateStreak.mutateAsync({
-            todoId: todo.id,
-            todoTitle: todo.title,
-            recurrence: todo.recurrence,
+            todoId: todo.id, todoTitle: todo.title, recurrence: todo.recurrence,
           }) as number;
         } catch {}
       }
@@ -129,11 +138,12 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
     }
   };
 
-  const activeTodos = todos.filter((t: any) => !t.completed);
-  const completedTodos = todos.filter((t: any) => t.completed);
+  const activeTodos = (todos as any[]).filter((t: any) => !t.completed);
+  const completedTodos = (todos as any[]).filter((t: any) => t.completed);
 
   const einmalig = activeTodos.filter((t: any) => !t.recurrence || t.recurrence === "none");
   const daily = activeTodos.filter((t: any) => t.recurrence === "daily");
+  const every2days = activeTodos.filter((t: any) => t.recurrence === "every2days");
   const weekly = activeTodos.filter((t: any) => t.recurrence === "weekly");
   const monthly = activeTodos.filter((t: any) => t.recurrence === "monthly");
 
@@ -143,6 +153,7 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   const sections = [
     { key: "einmalig", label: "Einmalig", items: einmalig },
     { key: "daily", label: "Täglich", items: daily },
+    { key: "every2days", label: "Alle 2 Tage", items: every2days },
     { key: "weekly", label: "Wöchentlich", items: weekly },
     { key: "monthly", label: "Monatlich", items: monthly },
   ];
@@ -232,11 +243,23 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
                 <SelectContent>
                   <SelectItem value="none">Keine</SelectItem>
                   <SelectItem value="daily">Täglich</SelectItem>
+                  <SelectItem value="every2days">Alle 2 Tage</SelectItem>
                   <SelectItem value="weekly">Wöchentlich</SelectItem>
                   <SelectItem value="monthly">Monatlich</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {dueDate && (
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground flex items-center gap-1"><Bell className="h-3 w-3" /> Erinnerung</label>
+                <Select value={reminder} onValueChange={setReminder}>
+                  <SelectTrigger className="h-9 rounded-lg bg-card border-0 text-xs text-foreground"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {REMINDER_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {(labels as any[]).length > 0 && (
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="h-3 w-3" /> Label</label>
@@ -282,8 +305,10 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
                   todo={todo}
                   label={getLabel(todo.label_id)}
                   streak={getStreak(todo.id)}
+                  labels={labels as any[]}
                   onToggle={() => handleToggle(todo)}
                   onDelete={() => deleteTodo.mutate(todo.id)}
+                  onUpdate={(updates: any) => updateTodo.mutate({ id: todo.id, ...updates })}
                 />
               ))}
             </div>
@@ -295,7 +320,9 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-2">Erledigt</p>
               {completedTodos.map((todo: any) => (
-                <TodoItem key={todo.id} todo={todo} label={getLabel(todo.label_id)} streak={getStreak(todo.id)} onToggle={() => handleToggle(todo)} onDelete={() => deleteTodo.mutate(todo.id)} />
+                <TodoItem key={todo.id} todo={todo} label={getLabel(todo.label_id)} streak={getStreak(todo.id)} labels={labels as any[]}
+                  onToggle={() => handleToggle(todo)} onDelete={() => deleteTodo.mutate(todo.id)}
+                  onUpdate={(updates: any) => updateTodo.mutate({ id: todo.id, ...updates })} />
               ))}
             </div>
           )}
@@ -305,56 +332,151 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   );
 }
 
-function TodoItem({ todo, label, streak, onToggle, onDelete }: { todo: any; label: any; streak: any; onToggle: () => void; onDelete: () => void }) {
+function TodoItem({ todo, label, streak, labels, onToggle, onDelete, onUpdate }: {
+  todo: any; label: any; streak: any; labels: any[];
+  onToggle: () => void; onDelete: () => void; onUpdate: (updates: any) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(todo.title);
+  const [editDesc, setEditDesc] = useState(todo.description || "");
+  const [editDueDate, setEditDueDate] = useState(todo.due_date || "");
+  const [editDueTime, setEditDueTime] = useState(todo.due_time || "");
+  const [editRecurrence, setEditRecurrence] = useState(todo.recurrence || "none");
+  const [editLabelId, setEditLabelId] = useState(todo.label_id || "none");
+  const [editIcon, setEditIcon] = useState(todo.icon || "");
+  const [editReminder, setEditReminder] = useState("none");
+  const [showEditIconPicker, setShowEditIconPicker] = useState(false);
+
   const hasMeta = todo.due_date || todo.recurrence;
   const hasStreak = streak && streak.current_streak > 0;
+
+  const handleSaveEdit = () => {
+    const reminderAt = editDueDate && editReminder !== "none" ? computeReminderAt(editDueDate, editDueTime, editReminder) : null;
+    onUpdate({
+      title: editTitle.trim(),
+      description: editDesc.trim() || null,
+      due_date: editDueDate || null,
+      due_time: editDueTime || null,
+      recurrence: editRecurrence !== "none" ? editRecurrence : null,
+      label_id: editLabelId !== "none" ? editLabelId : null,
+      icon: editIcon || null,
+      reminder_at: reminderAt,
+    });
+    setEditing(false);
+  };
+
   return (
-    <div className="group p-3 rounded-xl bg-card shadow-soft transition-all duration-200 hover:shadow-card">
-      <div className="flex items-start gap-3">
-        <button onClick={onToggle}
-          className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 mt-0.5 ${
-            todo.completed ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-foreground/50"
-          }`}>
-          {todo.completed && <Check className="h-3 w-3 text-primary-foreground" />}
-        </button>
-        <div className="flex-1 min-w-0" onClick={() => todo.description && setExpanded(!expanded)}>
-          <div className="flex items-center gap-2">
-            {todo.icon && <span className="text-sm flex-shrink-0">{todo.icon}</span>}
-            {label && !todo.icon && <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />}
-            <span className={`text-sm transition-all duration-200 ${todo.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-              {todo.title}
-            </span>
-            {todo.description && <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
-            {hasStreak && <StreakBadge streak={streak.current_streak} size="sm" />}
-          </div>
-          {label && <span className="text-[9px] text-muted-foreground">{label.name}</span>}
-          {hasMeta && !todo.completed && (
-            <div className="flex items-center gap-2 mt-0.5">
-              {todo.due_date && (
-                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                  <Calendar className="h-2.5 w-2.5" />
-                  {format(new Date(todo.due_date), "dd. MMM", { locale: de })}
-                  {todo.due_time && ` ${todo.due_time.slice(0, 5)}`}
-                </span>
-              )}
-              {todo.recurrence && todo.recurrence !== "none" && (
-                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                  <RefreshCw className="h-2.5 w-2.5" />
-                  {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}
-                </span>
-              )}
+    <>
+      <div className="group p-3 rounded-xl bg-card shadow-soft transition-all duration-200 hover:shadow-card">
+        <div className="flex items-start gap-3">
+          <button onClick={onToggle}
+            className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 mt-0.5 ${
+              todo.completed ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-foreground/50"
+            }`}>
+            {todo.completed && <Check className="h-3 w-3 text-primary-foreground" />}
+          </button>
+          <div className="flex-1 min-w-0" onClick={() => todo.description && setExpanded(!expanded)}>
+            <div className="flex items-center gap-2">
+              {todo.icon && <span className="text-sm flex-shrink-0">{todo.icon}</span>}
+              {label && !todo.icon && <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />}
+              <span className={`text-sm transition-all duration-200 ${todo.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                {todo.title}
+              </span>
+              {todo.description && <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+              {hasStreak && <StreakBadge streak={streak.current_streak} size="sm" />}
+              {todo.reminder_at && <Bell className="h-3 w-3 text-primary flex-shrink-0" />}
             </div>
-          )}
-          {expanded && todo.description && (
-            <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">{todo.description}</p>
-          )}
+            {label && <span className="text-[9px] text-muted-foreground">{label.name}</span>}
+            {hasMeta && !todo.completed && (
+              <div className="flex items-center gap-2 mt-0.5">
+                {todo.due_date && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                    <Calendar className="h-2.5 w-2.5" />
+                    {format(new Date(todo.due_date), "dd. MMM", { locale: de })}
+                    {todo.due_time && ` ${todo.due_time.slice(0, 5)}`}
+                  </span>
+                )}
+                {todo.recurrence && todo.recurrence !== "none" && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "every2days" ? "Alle 2 Tage" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}
+                  </span>
+                )}
+              </div>
+            )}
+            {expanded && todo.description && (
+              <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">{todo.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-foreground">
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button onClick={onDelete} className="text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all duration-200">
-          <Trash2 className="h-4 w-4" />
-        </button>
       </div>
-    </div>
+
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent className="rounded-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Aufgabe bearbeiten</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <Input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Titel" className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+            <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Beschreibung" className="rounded-xl bg-secondary border-0 text-xs text-foreground resize-none" rows={2} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground" />
+              <Input type="time" value={editDueTime} onChange={e => setEditDueTime(e.target.value)} className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground" />
+            </div>
+            <Select value={editRecurrence} onValueChange={setEditRecurrence}>
+              <SelectTrigger className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Keine Wiederholung</SelectItem>
+                <SelectItem value="daily">Täglich</SelectItem>
+                <SelectItem value="every2days">Alle 2 Tage</SelectItem>
+                <SelectItem value="weekly">Wöchentlich</SelectItem>
+                <SelectItem value="monthly">Monatlich</SelectItem>
+              </SelectContent>
+            </Select>
+            {editDueDate && (
+              <Select value={editReminder} onValueChange={setEditReminder}>
+                <SelectTrigger className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {labels.length > 0 && (
+              <Select value={editLabelId} onValueChange={setEditLabelId}>
+                <SelectTrigger className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Kein Label</SelectItem>
+                  {labels.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+                        {l.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <button type="button" onClick={() => setShowEditIconPicker(true)}
+              className="h-9 w-full rounded-lg bg-secondary text-xs text-foreground flex items-center px-3 gap-2">
+              {editIcon ? <span className="text-lg">{editIcon}</span> : <span className="text-muted-foreground">Icon wählen</span>}
+            </button>
+            <div className="flex gap-2">
+              <Button onClick={handleSaveEdit} className="flex-1 rounded-xl" disabled={!editTitle.trim()}>Speichern</Button>
+              <Button variant="outline" onClick={() => setEditing(false)} className="rounded-xl">Abbrechen</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <IconPicker open={showEditIconPicker} onClose={() => setShowEditIconPicker(false)} onSelect={setEditIcon} selected={editIcon} />
+    </>
   );
 }
 
@@ -399,7 +521,6 @@ function PersonalChallengesSection() {
 
   const getLabel = (id: string | null) => id ? (labels as any[]).find((l: any) => l.id === id) : null;
 
-  // Check if count challenge has ended
   const isCountEnded = (ch: any) => {
     if (!ch.end_date) return false;
     const end = new Date(`${ch.end_date}${ch.end_time ? "T" + ch.end_time : "T23:59:59"}`);
@@ -419,11 +540,9 @@ function PersonalChallengesSection() {
             <form onSubmit={(e) => {
               e.preventDefault();
               createChallenge.mutate({
-                name,
-                challenge_type: type,
+                name, challenge_type: type,
                 label_id: labelId !== "none" ? labelId : undefined,
-                end_date: endDate || undefined,
-                end_time: endTime || undefined,
+                end_date: endDate || undefined, end_time: endTime || undefined,
               } as any);
               setName(""); setType("count"); setLabelId("none"); setEndDate(""); setEndTime(""); setShowAdvanced(false);
               setShowCreate(false);
@@ -487,32 +606,12 @@ function PersonalChallengesSection() {
         <div className="space-y-3">
           {(challenges as any[]).map((ch: any) => (
             <ChallengeCard
-              key={ch.id}
-              ch={ch}
-              label={getLabel(ch.label_id)}
-              isCountEnded={isCountEnded(ch)}
-              timerRunning={timerRunning}
-              timerChallengeId={timerChallengeId}
-              timerElapsed={timerElapsed}
-              formatMs={formatMs}
-              showTimes={showTimes}
-              setShowTimes={setShowTimes}
-              onTimerStart={() => {
-                setTimerChallengeId(ch.id);
-                setTimerStart(Date.now());
-                setTimerElapsed(0);
-                setTimerRunning(true);
-              }}
-              onTimerSave={() => {
-                setTimerRunning(false);
-                updateChallenge.mutate({ id: ch.id, updates: { best_time_ms: ch.best_time_ms ? Math.min(ch.best_time_ms, timerElapsed) : timerElapsed } });
-                return timerElapsed;
-              }}
-              onTimerDiscard={() => {
-                setTimerRunning(false);
-                setTimerElapsed(0);
-                setTimerChallengeId(null);
-              }}
+              key={ch.id} ch={ch} label={getLabel(ch.label_id)} isCountEnded={isCountEnded(ch)}
+              timerRunning={timerRunning} timerChallengeId={timerChallengeId} timerElapsed={timerElapsed}
+              formatMs={formatMs} showTimes={showTimes} setShowTimes={setShowTimes}
+              onTimerStart={() => { setTimerChallengeId(ch.id); setTimerStart(Date.now()); setTimerElapsed(0); setTimerRunning(true); }}
+              onTimerSave={() => { setTimerRunning(false); updateChallenge.mutate({ id: ch.id, updates: { best_time_ms: ch.best_time_ms ? Math.min(ch.best_time_ms, timerElapsed) : timerElapsed } }); return timerElapsed; }}
+              onTimerDiscard={() => { setTimerRunning(false); setTimerElapsed(0); setTimerChallengeId(null); }}
               onUpdate={(updates: any) => updateChallenge.mutate({ id: ch.id, updates })}
               onDelete={() => deleteChallenge.mutate(ch.id)}
               onPost={() => setPostChallenge(ch)}
@@ -524,8 +623,7 @@ function PersonalChallengesSection() {
 
       {postChallenge && (
         <TodoCompletionPostDialog
-          open={!!postChallenge}
-          onClose={() => setPostChallenge(null)}
+          open={!!postChallenge} onClose={() => setPostChallenge(null)}
           todoTitle={postChallenge.name}
           todoDescription={`${postChallenge.challenge_type === "count" ? `Zähler: ${postChallenge.score}` : postChallenge.challenge_type === "time" ? `Beste Zeit: ${formatMs(postChallenge.best_time_ms || 0)}` : "Durchhalten Challenge"}`}
         />
@@ -564,35 +662,27 @@ function ChallengeCard({ ch, label, isCountEnded, timerRunning, timerChallengeId
         </div>
       </div>
 
-      {/* COUNT */}
       {ch.challenge_type === "count" && (
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-6 py-2">
-            <button
-              disabled={isCountEnded}
-              onClick={() => onUpdate({ score: Math.max(0, (ch.score || 0) - 1) })}
+            <button disabled={isCountEnded} onClick={() => onUpdate({ score: Math.max(0, (ch.score || 0) - 1) })}
               className="h-14 w-14 rounded-2xl bg-secondary flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40">
               <Minus className="h-6 w-6" />
             </button>
             <span className="text-4xl font-bold text-foreground tabular-nums min-w-[60px] text-center">{ch.score || 0}</span>
-            <button
-              disabled={isCountEnded}
-              onClick={() => onUpdate({ score: (ch.score || 0) + 1 })}
+            <button disabled={isCountEnded} onClick={() => onUpdate({ score: (ch.score || 0) + 1 })}
               className="h-14 w-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40">
               <Plus className="h-6 w-6" />
             </button>
           </div>
           {ch.end_date && (
             <p className="text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-              <Clock className="h-3 w-3" />
-              Ende: {format(new Date(ch.end_date), "dd. MMM", { locale: de })}
-              {ch.end_time && ` ${ch.end_time.slice(0, 5)}`}
+              <Clock className="h-3 w-3" /> Ende: {format(new Date(ch.end_date), "dd. MMM", { locale: de })}{ch.end_time && ` ${ch.end_time.slice(0, 5)}`}
             </p>
           )}
         </div>
       )}
 
-      {/* TIME */}
       {ch.challenge_type === "time" && (
         <div className="text-center space-y-3 py-2">
           <p className="text-3xl font-mono font-bold text-foreground tabular-nums">
@@ -600,21 +690,15 @@ function ChallengeCard({ ch, label, isCountEnded, timerRunning, timerChallengeId
           </p>
           <div className="flex gap-2 justify-center flex-wrap">
             {(!timerRunning || timerChallengeId !== ch.id) ? (
-              <Button size="sm" className="rounded-xl" onClick={onTimerStart}>
-                <Play className="h-3 w-3 mr-1" /> Start
-              </Button>
+              <Button size="sm" className="rounded-xl" onClick={onTimerStart}><Play className="h-3 w-3 mr-1" /> Start</Button>
             ) : (
               <>
                 <Button size="sm" className="rounded-xl" onClick={() => {
                   const elapsed = onTimerSave();
                   saveChallengeTime.mutate({ challengeId: ch.id, timeMs: elapsed });
                   toast({ title: "Zeit gespeichert! ⏱️" });
-                }}>
-                  <Save className="h-3 w-3 mr-1" /> Speichern
-                </Button>
-                <Button size="sm" variant="outline" className="rounded-xl" onClick={onTimerDiscard}>
-                  <X className="h-3 w-3 mr-1" /> Verwerfen
-                </Button>
+                }}><Save className="h-3 w-3 mr-1" /> Speichern</Button>
+                <Button size="sm" variant="outline" className="rounded-xl" onClick={onTimerDiscard}><X className="h-3 w-3 mr-1" /> Verwerfen</Button>
               </>
             )}
             <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setShowTimes(showTimes === ch.id ? null : ch.id)}>
@@ -640,36 +724,25 @@ function ChallengeCard({ ch, label, isCountEnded, timerRunning, timerChallengeId
         </div>
       )}
 
-      {/* ENDURANCE */}
       {ch.challenge_type === "endurance" && !ch.given_up && (
         <div className="text-center space-y-3 py-2">
           <EnduranceTimer startedAt={ch.started_at} />
-          {ch.longest_time_ms && (
-            <p className="text-xs text-muted-foreground">🏅 Längstes: {formatDuration(0, ch.longest_time_ms)}</p>
-          )}
+          {ch.longest_time_ms && <p className="text-xs text-muted-foreground">🏅 Längstes: {formatDuration(0, ch.longest_time_ms)}</p>}
           <Button size="sm" variant="destructive" className="rounded-xl" onClick={() => {
             const elapsed = Date.now() - new Date(ch.started_at).getTime();
             const longest = ch.longest_time_ms ? Math.max(ch.longest_time_ms, elapsed) : elapsed;
             onUpdate({ given_up: true, ended_at: new Date().toISOString(), longest_time_ms: longest });
-          }}>
-            <Flag className="h-3 w-3 mr-1" /> Aufgeben
-          </Button>
+          }}><Flag className="h-3 w-3 mr-1" /> Aufgeben</Button>
         </div>
       )}
       {ch.challenge_type === "endurance" && ch.given_up && (
         <div className="text-center space-y-3 py-2">
-          <p className="text-sm text-muted-foreground">
-            Aufgegeben nach {formatDuration(new Date(ch.started_at).getTime(), new Date(ch.ended_at).getTime())}
-          </p>
-          {ch.longest_time_ms && (
-            <p className="text-xs text-muted-foreground">🏅 Längstes: {formatDuration(0, ch.longest_time_ms)}</p>
-          )}
+          <p className="text-sm text-muted-foreground">Aufgegeben nach {formatDuration(new Date(ch.started_at).getTime(), new Date(ch.ended_at).getTime())}</p>
+          {ch.longest_time_ms && <p className="text-xs text-muted-foreground">🏅 Längstes: {formatDuration(0, ch.longest_time_ms)}</p>}
           <Button size="sm" className="rounded-xl" onClick={() => {
             onUpdate({ given_up: false, started_at: new Date().toISOString(), ended_at: null });
             toast({ title: "Neustart! 💪" });
-          }}>
-            <Play className="h-3 w-3 mr-1" /> Neu starten
-          </Button>
+          }}><Play className="h-3 w-3 mr-1" /> Neu starten</Button>
         </div>
       )}
     </div>

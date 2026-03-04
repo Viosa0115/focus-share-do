@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Send, Plus, Minus, Camera, Eye, Save, X, Download, Search, Flame, Settings, File, Video, Clock, Timer } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useDirectMessages, useSendDirectMessage, useDirectTodos, useCreateDirectTodo, useToggleDirectTodo, useDirectChallenges, useCreateDirectChallenge, useUpdateDirectChallengeScore } from "@/hooks/use-direct-messages";
+import { useDirectMessages, useSendDirectMessage, useDirectTodos, useCreateDirectTodo, useToggleDirectTodo, useUpdateDirectTodo, useDeleteDirectTodo, useDirectChallenges, useCreateDirectChallenge, useUpdateDirectChallengeScore } from "@/hooks/use-direct-messages";
 import { useFriends } from "@/hooks/use-friends";
 import { useChatStreak, useUpdateChatStreak } from "@/hooks/use-chat-streaks";
 import { useTodoLabels } from "@/hooks/use-todo-labels";
@@ -395,30 +395,62 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
   const { data: todos = [] } = useDirectTodos(friendshipId);
   const createTodo = useCreateDirectTodo(friendshipId);
   const toggleTodo = useToggleDirectTodo(friendshipId);
+  const updateTodo = useUpdateDirectTodo(friendshipId);
+  const deleteTodo = useDeleteDirectTodo(friendshipId);
   const { data: labels = [] } = useTodoLabels();
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
+  const [recurrence, setRecurrence] = useState("");
   const [labelName, setLabelName] = useState("");
   const [labelColor, setLabelColor] = useState("");
   const [addToCalendar, setAddToCalendar] = useState(false);
+  const [reminder, setReminder] = useState("none");
+  const [editingTodo, setEditingTodo] = useState<any>(null);
 
   const handleCreate = () => {
+    const { computeReminderAt } = require("@/hooks/use-reminders");
+    const reminderAt = dueDate && reminder !== "none" ? computeReminderAt(dueDate, dueTime, reminder) : undefined;
     createTodo.mutate({
-      title,
-      description: "",
-      due_date: dueDate || undefined,
-      due_time: dueTime || undefined,
-      label_name: labelName || undefined,
-      label_color: labelColor || undefined,
-      add_to_calendar: addToCalendar,
+      title, description: description || undefined,
+      due_date: dueDate || undefined, due_time: dueTime || undefined,
+      recurrence: recurrence || undefined,
+      label_name: labelName || undefined, label_color: labelColor || undefined,
+      add_to_calendar: addToCalendar, reminder_at: reminderAt || undefined,
     });
-    setTitle(""); setDueDate(""); setDueTime(""); setLabelName(""); setLabelColor(""); setAddToCalendar(false);
+    setTitle(""); setDescription(""); setDueDate(""); setDueTime(""); setRecurrence("");
+    setLabelName(""); setLabelColor(""); setAddToCalendar(false); setReminder("none");
     setShowCreate(false);
   };
 
+  const handleSaveEdit = () => {
+    if (!editingTodo) return;
+    const { computeReminderAt } = require("@/hooks/use-reminders");
+    const reminderAt = editingTodo.due_date && editingTodo.reminder !== "none"
+      ? computeReminderAt(editingTodo.due_date, editingTodo.due_time, editingTodo.reminder) : null;
+    updateTodo.mutate({
+      id: editingTodo.id,
+      title: editingTodo.title,
+      description: editingTodo.description || null,
+      due_date: editingTodo.due_date || null,
+      due_time: editingTodo.due_time || null,
+      recurrence: editingTodo.recurrence || null,
+      label_name: editingTodo.label_name || null,
+      label_color: editingTodo.label_color || null,
+      add_to_calendar: editingTodo.add_to_calendar || false,
+      reminder_at: reminderAt,
+    });
+    setEditingTodo(null);
+  };
+
   const labelColors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899"];
+  const reminderOptions = [
+    { value: "none", label: "Keine" }, { value: "10min", label: "10 Min" },
+    { value: "1h", label: "1 Std" }, { value: "3h", label: "3 Std" },
+    { value: "6h", label: "6 Std" }, { value: "1day", label: "1 Tag" },
+  ];
 
   return (
     <div className="overflow-y-auto h-full px-4 py-4 space-y-4">
@@ -428,10 +460,11 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
           <DialogTrigger asChild>
             <Button size="sm" variant="outline" className="rounded-xl text-xs h-8"><Plus className="h-3 w-3 mr-1" /> Neu</Button>
           </DialogTrigger>
-          <DialogContent className="rounded-2xl">
+          <DialogContent className="rounded-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Neue Aufgabe</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Aufgabe..." required className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Beschreibung (optional)" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Datum</label>
@@ -442,6 +475,30 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
                   <Input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
                 </div>
               </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Wiederholung</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[{ val: "", label: "Keine" }, { val: "daily", label: "Täglich" }, { val: "every2days", label: "Alle 2T" }, { val: "weekly", label: "Wöchentl." }, { val: "monthly", label: "Monatl." }].map(({ val, label }) => (
+                    <button key={val} type="button" onClick={() => setRecurrence(val)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${recurrence === val ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {dueDate && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Erinnerung</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {reminderOptions.map(o => (
+                      <button key={o.value} type="button" onClick={() => setReminder(o.value)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${reminder === o.value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Label</label>
                 <Input value={labelName} onChange={(e) => setLabelName(e.target.value)} placeholder="Label Name" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
@@ -473,7 +530,7 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
           {(todos as any[]).map((todo: any) => {
             const myCompleted = (todo.completed_by || []).includes(user?.id);
             return (
-              <div key={todo.id} className="p-3 rounded-xl bg-card shadow-soft">
+              <div key={todo.id} className="group p-3 rounded-xl bg-card shadow-soft">
                 <div className="flex items-center gap-3">
                   <button onClick={() => toggleTodo.mutate({ todoId: todo.id, completedBy: todo.completed_by || [] })}
                     className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${myCompleted ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
@@ -488,11 +545,23 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
                       )}
                       <span className={`text-sm ${myCompleted ? "line-through text-muted-foreground" : "text-foreground"}`}>{todo.title}</span>
                     </div>
-                    {(todo.due_date || todo.due_time) && (
+                    {todo.description && <p className="text-[10px] text-muted-foreground">{todo.description}</p>}
+                    {(todo.due_date || todo.due_time || todo.recurrence) && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         {todo.due_date && format(new Date(todo.due_date), "dd.MM.yyyy")}
                         {todo.due_time && ` ${todo.due_time}`}
+                        {todo.recurrence && ` · 🔄 ${todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "every2days" ? "Alle 2 Tage" : todo.recurrence === "weekly" ? "Wöchentl." : "Monatl."}`}
                       </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setEditingTodo({ ...todo, reminder: "none" })} className="text-muted-foreground hover:text-foreground">
+                      <Settings className="h-3.5 w-3.5" />
+                    </button>
+                    {todo.created_by === user?.id && (
+                      <button onClick={() => deleteTodo.mutate(todo.id)} className="text-muted-foreground hover:text-destructive">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -501,6 +570,24 @@ function DMTodosTab({ friendshipId }: { friendshipId: string }) {
           })}
         </div>
       )}
+
+      {/* Edit dialog */}
+      <Dialog open={!!editingTodo} onOpenChange={(o) => !o && setEditingTodo(null)}>
+        <DialogContent className="rounded-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Aufgabe bearbeiten</DialogTitle></DialogHeader>
+          {editingTodo && (
+            <div className="space-y-4">
+              <Input value={editingTodo.title} onChange={e => setEditingTodo({ ...editingTodo, title: e.target.value })} className="h-12 rounded-xl bg-secondary border-0 text-foreground" />
+              <Input value={editingTodo.description || ""} onChange={e => setEditingTodo({ ...editingTodo, description: e.target.value })} placeholder="Beschreibung" className="h-10 rounded-xl bg-secondary border-0 text-foreground text-xs" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input type="date" value={editingTodo.due_date || ""} onChange={e => setEditingTodo({ ...editingTodo, due_date: e.target.value })} className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground" />
+                <Input type="time" value={editingTodo.due_time || ""} onChange={e => setEditingTodo({ ...editingTodo, due_time: e.target.value })} className="h-9 rounded-lg bg-secondary border-0 text-xs text-foreground" />
+              </div>
+              <Button onClick={handleSaveEdit} className="w-full rounded-xl" disabled={!editingTodo.title?.trim()}>Speichern</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
