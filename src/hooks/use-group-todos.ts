@@ -84,6 +84,43 @@ export function useCreateGroupTodo(groupId: string | undefined) {
   });
 }
 
+export function useUpdateGroupTodo(groupId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: {
+      id: string;
+      title?: string;
+      description?: string | null;
+      due_date?: string | null;
+      due_time?: string | null;
+      recurrence?: string | null;
+      label_name?: string | null;
+      label_color?: string | null;
+      assigned_to?: string[];
+      icon?: string | null;
+      reminder_at?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("group_todos")
+        .update(updates as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["group-todos", groupId] }),
+  });
+}
+
+export function useDeleteGroupTodo(groupId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("group_todos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["group-todos", groupId] }),
+  });
+}
+
 export function useToggleGroupTodo(groupId: string | undefined) {
   const { user } = useAuth();
   const qc = useQueryClient();
