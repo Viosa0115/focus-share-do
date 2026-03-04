@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useGroupMessages, useSendMessage, useGroupChatMedia } from "@/hooks/use-group-chat";
-import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo } from "@/hooks/use-group-todos";
+import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo, useUpdateGroupTodo, useDeleteGroupTodo } from "@/hooks/use-group-todos";
 import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp, useAcceptEndurance, useDeclineEndurance } from "@/hooks/use-challenges";
 import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
 import { useGroupMembers } from "@/hooks/use-group-members";
@@ -441,6 +441,8 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
   const { data: todos = [], isLoading } = useGroupTodos(groupId);
   const createTodo = useCreateGroupTodo(groupId);
   const toggleTodo = useToggleGroupTodo(groupId);
+  const updateTodo = useUpdateGroupTodo(groupId);
+  const deleteTodoMut = useDeleteGroupTodo(groupId);
   const { data: members = [] } = useGroupMembers(groupId);
   const { data: lists = [] } = useGroupLists(groupId);
   const createList = useCreateGroupList(groupId);
@@ -589,7 +591,7 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
                 const isDone = todo.completion_type === "single" ? completedCount > 0 : completedCount >= totalMembers;
 
                 return (
-                  <div key={todo.id} className={`p-3 rounded-xl bg-card shadow-soft transition-all duration-200 ${isDone ? "opacity-60" : ""}`}>
+                  <div key={todo.id} className={`group p-3 rounded-xl bg-card shadow-soft transition-all duration-200 ${isDone ? "opacity-60" : ""}`}>
                     <div className="flex items-center gap-3">
                       <button onClick={() => canTodos && toggleTodo.mutate({ todoId: todo.id, completed: !myCompletion })} disabled={!canTodos}
                         className={`flex-shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${myCompletion ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
@@ -605,7 +607,7 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-[10px] text-muted-foreground">{completedCount}/{todo.completion_type === "all" ? totalMembers : 1} erledigt</p>
                           {todo.due_date && <p className="text-[10px] text-muted-foreground">📅 {format(new Date(todo.due_date), "dd.MM.")}{todo.due_time && ` ${todo.due_time.slice(0, 5)}`}</p>}
-                          {todo.recurrence && <p className="text-[10px] text-muted-foreground">🔄 {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}</p>}
+                          {todo.recurrence && <p className="text-[10px] text-muted-foreground">🔄 {todo.recurrence === "daily" ? "Täglich" : todo.recurrence === "every2days" ? "Alle 2 Tage" : todo.recurrence === "weekly" ? "Wöchentlich" : "Monatlich"}</p>}
                         </div>
                         {(todo.assigned_to as string[] || []).length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
@@ -622,6 +624,11 @@ function TodosTab({ groupId, canTodos }: { groupId: string; canTodos: boolean })
                           </div>
                         )}
                       </div>
+                      {(todo.created_by === user?.id) && (
+                        <button onClick={() => deleteTodoMut.mutate(todo.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

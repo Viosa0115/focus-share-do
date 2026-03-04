@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
+import { useReminderChecker } from "@/hooks/use-reminders";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Groups from "./pages/Groups";
@@ -17,6 +18,11 @@ import News from "./pages/News";
 import Profile from "./pages/Profile";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+
+function ReminderWrapper({ children }: { children: React.ReactNode }) {
+  useReminderChecker();
+  return <>{children}</>;
+}
 
 const queryClient = new QueryClient();
 
@@ -53,6 +59,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ReminderWrapper>
             <Routes>
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -67,6 +74,7 @@ const App = () => (
               <Route path="/privacy" element={<ProtectedRoute><PrivacyPolicy /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </ReminderWrapper>
           </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
