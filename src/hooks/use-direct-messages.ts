@@ -84,6 +84,8 @@ export function useCreateDirectTodo(friendshipId: string | undefined) {
       label_name?: string;
       label_color?: string;
       add_to_calendar?: boolean;
+      recurrence?: string;
+      reminder_at?: string;
     }) => {
       const { error } = await supabase.from("direct_todos").insert({
         friendship_id: friendshipId!,
@@ -95,7 +97,45 @@ export function useCreateDirectTodo(friendshipId: string | undefined) {
         label_name: params.label_name || null,
         label_color: params.label_color || null,
         add_to_calendar: params.add_to_calendar || false,
+        recurrence: params.recurrence || null,
+        reminder_at: params.reminder_at || null,
       } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["direct-todos", friendshipId] }),
+  });
+}
+
+export function useUpdateDirectTodo(friendshipId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: {
+      id: string;
+      title?: string;
+      description?: string | null;
+      due_date?: string | null;
+      due_time?: string | null;
+      label_name?: string | null;
+      label_color?: string | null;
+      add_to_calendar?: boolean;
+      recurrence?: string | null;
+      reminder_at?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("direct_todos")
+        .update(updates as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["direct-todos", friendshipId] }),
+  });
+}
+
+export function useDeleteDirectTodo(friendshipId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("direct_todos").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["direct-todos", friendshipId] }),
