@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useGroupMessages, useSendMessage, useGroupChatMedia } from "@/hooks/use-group-chat";
-import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo } from "@/hooks/use-group-todos";
+import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo, useUpdateGroupTodo, useDeleteGroupTodo } from "@/hooks/use-group-todos";
 import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp, useAcceptEndurance, useDeclineEndurance } from "@/hooks/use-challenges";
 import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
 import { useGroupMembers } from "@/hooks/use-group-members";
