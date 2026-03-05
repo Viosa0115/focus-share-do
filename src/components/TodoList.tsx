@@ -3,7 +3,7 @@ import { Check, Plus, Trash2, Calendar, RefreshCw, ChevronDown, ChevronUp, Tag, 
 import { useTodos, useCreateTodo, useToggleTodo, useDeleteTodo, useUpdateTodo, shouldResetRecurringTodo } from "@/hooks/use-todos";
 import { useTodoLabels, useCreateLabel, useDeleteLabel } from "@/hooks/use-todo-labels";
 import { usePersonalChallenges, useCreatePersonalChallenge, useUpdatePersonalChallenge, useDeletePersonalChallenge } from "@/hooks/use-personal-challenges";
-import { useTodoStreaks, useUpdateStreak } from "@/hooks/use-todo-streaks";
+import { useTodoStreaks, useUpdateStreak, getDisplayStreak } from "@/hooks/use-todo-streaks";
 import { useSaveTodoCompletion } from "@/hooks/use-todo-completions";
 import { useChallengeTimes, useSaveChallengeTime } from "@/hooks/use-personal-challenge-times";
 import { computeReminderAt } from "@/hooks/use-reminders";
@@ -138,7 +138,9 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
     }
   };
 
-  const activeTodos = (todos as any[]).filter((t: any) => !t.completed);
+  const today = new Date().toISOString().split("T")[0];
+  const activeTodos = (todos as any[]).filter((t: any) => !t.completed && (!t.due_date || t.due_date >= today || (t.recurrence && t.recurrence !== "none")));
+  const overdueTodos = (todos as any[]).filter((t: any) => !t.completed && t.due_date && t.due_date < today && (!t.recurrence || t.recurrence === "none"));
   const completedTodos = (todos as any[]).filter((t: any) => t.completed);
 
   const einmalig = activeTodos.filter((t: any) => !t.recurrence || t.recurrence === "none");
@@ -148,7 +150,11 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
   const monthly = activeTodos.filter((t: any) => t.recurrence === "monthly");
 
   const getLabel = (id: string | null) => id ? (labels as any[]).find((l: any) => l.id === id) : null;
-  const getStreak = (todoId: string) => (streaks as any[]).find((s: any) => s.todo_id === todoId);
+  const getStreak = (todoId: string) => {
+    const s = (streaks as any[]).find((s: any) => s.todo_id === todoId);
+    if (!s) return null;
+    return { ...s, current_streak: getDisplayStreak(s) };
+  };
 
   const sections = [
     { key: "einmalig", label: "Einmalig", items: einmalig },
@@ -313,8 +319,18 @@ function TodosSection({ completedTodo, setCompletedTodo }: { completedTodo: any;
               ))}
             </div>
           ))}
-          {activeTodos.length === 0 && completedTodos.length === 0 && (
+          {activeTodos.length === 0 && completedTodos.length === 0 && overdueTodos.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">Noch keine Aufgaben. Fang an! ✨</p>
+          )}
+          {overdueTodos.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-destructive uppercase tracking-wider pt-2">⏰ Abgelaufen</p>
+              {overdueTodos.map((todo: any) => (
+                <TodoItem key={todo.id} todo={todo} label={getLabel(todo.label_id)} streak={getStreak(todo.id)} labels={labels as any[]}
+                  onToggle={() => handleToggle(todo)} onDelete={() => deleteTodo.mutate(todo.id)}
+                  onUpdate={(updates: any) => updateTodo.mutate({ id: todo.id, ...updates })} />
+              ))}
+            </div>
           )}
           {completedTodos.length > 0 && (
             <div className="space-y-2">
