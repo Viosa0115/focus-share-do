@@ -7,7 +7,6 @@ export function useAllChatStreaks() {
   return useQuery({
     queryKey: ["all-chat-streaks", user?.id],
     queryFn: async () => {
-      // Get all friendship IDs for user
       const { data: friendships } = await supabase
         .from("friendships")
         .select("id")
@@ -24,6 +23,24 @@ export function useAllChatStreaks() {
     },
     enabled: !!user,
   });
+}
+
+// Get the display streak value - returns 0 if streak is broken
+export function getDisplayChatStreak(streak: any): number {
+  if (!streak || streak.current_streak <= 0) return 0;
+  if (!streak.last_both_chatted_date) return 0;
+  
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  const yesterday = new Date(today.getTime() - 86400000);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+  
+  // Streak is valid if last_both_chatted_date is today or yesterday
+  if (streak.last_both_chatted_date === todayStr || streak.last_both_chatted_date === yesterdayStr) {
+    return streak.current_streak;
+  }
+  // Streak is broken
+  return 0;
 }
 
 export function useChatStreak(friendshipId: string | undefined) {
@@ -53,7 +70,6 @@ export function useUpdateChatStreak(friendshipId: string | undefined) {
       const isUser1 = user.id === requesterId;
       const myDateField = isUser1 ? "user1_last_msg_date" : "user2_last_msg_date";
 
-      // Get or create streak record
       let { data: streak } = await supabase
         .from("chat_streaks")
         .select("*")
@@ -74,19 +90,16 @@ export function useUpdateChatStreak(friendshipId: string | undefined) {
         return newStreak;
       }
 
-      // If I already messaged today, don't update streak again (max +1/day)
       const myCurrentDate = isUser1 ? streak.user1_last_msg_date : streak.user2_last_msg_date;
-      if (myCurrentDate === today) return; // Already counted today
+      if (myCurrentDate === today) return;
 
       const updateData: any = {
         [myDateField]: today,
         updated_at: new Date().toISOString(),
       };
 
-      // Check if both users have messaged today (other already messaged today)
       const otherDate = isUser1 ? streak.user2_last_msg_date : streak.user1_last_msg_date;
       if (otherDate === today) {
-        // Both messaged today - update streak (max +1)
         const lastBothDate = streak.last_both_chatted_date;
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);

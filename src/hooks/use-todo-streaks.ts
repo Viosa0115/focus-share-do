@@ -18,20 +18,36 @@ export function useTodoStreaks() {
   });
 }
 
-// Get current period key based on recurrence
+// Check if the streak is still valid (not broken)
+export function getDisplayStreak(streak: any): number {
+  if (!streak || streak.current_streak <= 0) return 0;
+  const now = new Date();
+  const currentPeriod = getCurrentPeriod(streak.recurrence);
+  const prevPeriod = getPreviousPeriod(streak.recurrence);
+  
+  // Streak is valid if last completed period is current or previous period
+  if (streak.last_completed_period === currentPeriod || streak.last_completed_period === prevPeriod) {
+    return streak.current_streak;
+  }
+  // Streak is broken
+  return 0;
+}
+
 function getCurrentPeriod(recurrence: string): string {
   const now = new Date();
   if (recurrence === "daily") {
-    return now.toISOString().slice(0, 10); // YYYY-MM-DD
+    return now.toISOString().slice(0, 10);
+  }
+  if (recurrence === "every2days") {
+    return now.toISOString().slice(0, 10);
   }
   if (recurrence === "weekly") {
-    // ISO week: year-weeknumber
     const jan1 = new Date(now.getFullYear(), 0, 1);
     const week = Math.ceil(((now.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
     return `${now.getFullYear()}-W${week}`;
   }
   if (recurrence === "monthly") {
-    return now.toISOString().slice(0, 7); // YYYY-MM
+    return now.toISOString().slice(0, 7);
   }
   return now.toISOString().slice(0, 10);
 }
@@ -40,6 +56,10 @@ function getPreviousPeriod(recurrence: string): string {
   const now = new Date();
   if (recurrence === "daily") {
     const prev = new Date(now.getTime() - 86400000);
+    return prev.toISOString().slice(0, 10);
+  }
+  if (recurrence === "every2days") {
+    const prev = new Date(now.getTime() - 2 * 86400000);
     return prev.toISOString().slice(0, 10);
   }
   if (recurrence === "weekly") {
@@ -63,7 +83,6 @@ export function useUpdateStreak() {
       const currentPeriod = getCurrentPeriod(recurrence);
       const prevPeriod = getPreviousPeriod(recurrence);
 
-      // Get existing streak
       const { data: existing } = await supabase
         .from("todo_streaks")
         .select("*")
@@ -72,7 +91,6 @@ export function useUpdateStreak() {
         .maybeSingle();
 
       if (!existing) {
-        // Create new streak
         await supabase.from("todo_streaks").insert({
           user_id: user!.id,
           todo_id: todoId,
@@ -85,12 +103,10 @@ export function useUpdateStreak() {
         return 1;
       }
 
-      // Already completed this period
       if (existing.last_completed_period === currentPeriod) {
         return existing.current_streak;
       }
 
-      // Check if previous period was completed (streak continues)
       const newStreak = existing.last_completed_period === prevPeriod
         ? existing.current_streak + 1
         : 1;
