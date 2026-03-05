@@ -347,7 +347,7 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
             const wasViewed = (msg.viewed_by || []).includes(user!.id) && msg.user_id !== user?.id;
 
             return (
-              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`} onDoubleClick={() => handleDoubleClick(msg.id)}>
+              <div key={msg.id} className={`group/msg flex ${isOwn ? "justify-end" : "justify-start"}`} onDoubleClick={() => handleDoubleClick(msg.id)}>
                 <div className={`max-w-[80%] space-y-1 ${pinnedMsgIds.has(msg.id) ? "border-l-2 border-primary pl-1" : ""}`}>
                   {!isOwn && <span className="text-[10px] font-medium text-muted-foreground ml-1">{getDisplayName(msg.user_id)}</span>}
                   {hasImage ? (
@@ -381,10 +381,20 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
                       {msg.content}
                     </div>
                   )}
-                  <span className="text-[10px] text-muted-foreground ml-1">
-                    {format(new Date(msg.created_at), "HH:mm")}
-                    {isSnap && isOwn && <span className="ml-1">⚡</span>}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      {format(new Date(msg.created_at), "HH:mm")}
+                      {isSnap && isOwn && <span className="ml-1">⚡</span>}
+                    </span>
+                    {(isOwn || isAdmin) && (
+                      <button onClick={async () => {
+                        await supabase.from("group_messages").delete().eq("id", msg.id);
+                        qc.invalidateQueries({ queryKey: ["group-messages", groupId] });
+                      }} className="text-muted-foreground hover:text-destructive opacity-0 group-hover/msg:opacity-100 transition-opacity ml-1">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
