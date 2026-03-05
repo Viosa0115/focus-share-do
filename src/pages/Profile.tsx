@@ -138,11 +138,11 @@ const Profile = () => {
   const recurrenceLabel = (r: string) => r === "daily" ? "Täglich" : r === "weekly" ? "Wöchentlich" : r === "monthly" ? "Monatlich" : "";
 
   const socialPlatforms = [
-    { key: "instagram", label: "Instagram", prefix: "@" },
-    { key: "tiktok", label: "TikTok", prefix: "@" },
-    { key: "pinterest", label: "Pinterest", prefix: "@" },
-    { key: "spotify", label: "Spotify", prefix: "" },
-    { key: "snapchat", label: "Snapchat", prefix: "@" },
+    { key: "instagram", label: "Instagram", prefix: "@", urlBase: "https://instagram.com/" },
+    { key: "tiktok", label: "TikTok", prefix: "@", urlBase: "https://tiktok.com/@" },
+    { key: "pinterest", label: "Pinterest", prefix: "@", urlBase: "https://pinterest.com/" },
+    { key: "spotify", label: "Spotify", prefix: "", urlBase: "" },
+    { key: "snapchat", label: "Snapchat", prefix: "@", urlBase: "https://snapchat.com/add/" },
   ];
   const hasSocialLinks = socialPlatforms.some(p => (profile as any)?.[p.key]);
 
@@ -263,7 +263,17 @@ const Profile = () => {
             </div>
           ) : hasSocialLinks ? (
             <div className="flex flex-wrap gap-2">
-              {socialPlatforms.map(p => { const val = (profile as any)?.[p.key]; if (!val) return null; return <span key={p.key} className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground">{p.label}: {val}</span>; })}
+              {socialPlatforms.map(p => {
+                const val = (profile as any)?.[p.key];
+                if (!val) return null;
+                const url = p.urlBase ? `${p.urlBase}${val.replace("@", "")}` : val;
+                return (
+                  <a key={p.key} href={url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground hover:bg-accent transition-colors">
+                    {p.label}: {val}
+                  </a>
+                );
+              })}
             </div>
           ) : <p className="text-xs text-muted-foreground">Keine Social Links hinterlegt</p>}
         </div>
