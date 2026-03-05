@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useGroupMessages, useSendMessage, useGroupChatMedia } from "@/hooks/use-group-chat";
 import { useGroupTodos, useCreateGroupTodo, useToggleGroupTodo, useUpdateGroupTodo, useDeleteGroupTodo } from "@/hooks/use-group-todos";
 import { useChallenges, useCreateChallenge, useJoinChallenge, useUpdateScore, useSaveTime, useGiveUp, useAcceptEndurance, useDeclineEndurance } from "@/hooks/use-challenges";
-import { useGroupEvents, useCreateEvent, useRsvp } from "@/hooks/use-events";
+import { useGroupEvents, useCreateEvent, useRsvp, useUpdateEvent, useDeleteEvent } from "@/hooks/use-events";
+import { IconPicker } from "@/components/IconPicker";
 import { useGroupMembers } from "@/hooks/use-group-members";
 import { useGroupLists, useCreateGroupList, useDeleteGroupList } from "@/hooks/use-group-lists";
 import { useFriends } from "@/hooks/use-friends";
@@ -115,7 +116,7 @@ const GroupDetail = () => {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {activeTab === "chat" && <ChatTab groupId={id} canChat={myMembership?.can_chat !== false} />}
+        {activeTab === "chat" && <ChatTab groupId={id} canChat={myMembership?.can_chat !== false} isAdmin={isAdmin} />}
         {activeTab === "todos" && <TodosTab groupId={id} canTodos={myMembership?.can_todos !== false} />}
         {activeTab === "challenges" && <ChallengesTab groupId={id} canChallenges={myMembership?.can_challenges !== false} />}
         {activeTab === "events" && <EventsTab groupId={id} canEvents={myMembership?.can_events !== false} />}
@@ -127,7 +128,7 @@ const GroupDetail = () => {
 };
 
 /* ============ CHAT TAB ============ */
-function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
+function ChatTab({ groupId, canChat, isAdmin }: { groupId: string; canChat: boolean; isAdmin: boolean }) {
   const { user } = useAuth();
   const { data: messages = [], isLoading } = useGroupMessages(groupId);
   const sendMessage = useSendMessage(groupId);
@@ -346,7 +347,7 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
             const wasViewed = (msg.viewed_by || []).includes(user!.id) && msg.user_id !== user?.id;
 
             return (
-              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`} onDoubleClick={() => handleDoubleClick(msg.id)}>
+              <div key={msg.id} className={`group/msg flex ${isOwn ? "justify-end" : "justify-start"}`} onDoubleClick={() => handleDoubleClick(msg.id)}>
                 <div className={`max-w-[80%] space-y-1 ${pinnedMsgIds.has(msg.id) ? "border-l-2 border-primary pl-1" : ""}`}>
                   {!isOwn && <span className="text-[10px] font-medium text-muted-foreground ml-1">{getDisplayName(msg.user_id)}</span>}
                   {hasImage ? (
@@ -380,10 +381,20 @@ function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
                       {msg.content}
                     </div>
                   )}
-                  <span className="text-[10px] text-muted-foreground ml-1">
-                    {format(new Date(msg.created_at), "HH:mm")}
-                    {isSnap && isOwn && <span className="ml-1">⚡</span>}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      {format(new Date(msg.created_at), "HH:mm")}
+                      {isSnap && isOwn && <span className="ml-1">⚡</span>}
+                    </span>
+                    {(isOwn || isAdmin) && (
+                      <button onClick={async () => {
+                        await supabase.from("group_messages").delete().eq("id", msg.id);
+                        qc.invalidateQueries({ queryKey: ["group-messages", groupId] });
+                      }} className="text-muted-foreground hover:text-destructive opacity-0 group-hover/msg:opacity-100 transition-opacity ml-1">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

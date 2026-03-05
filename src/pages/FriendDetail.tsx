@@ -4,7 +4,7 @@ import { ArrowLeft, MessageCircle, CheckSquare, Trophy, Send, Plus, Minus, Camer
 import { useAuth } from "@/lib/auth-context";
 import { useDirectMessages, useSendDirectMessage, useDirectTodos, useCreateDirectTodo, useToggleDirectTodo, useUpdateDirectTodo, useDeleteDirectTodo, useDirectChallenges, useCreateDirectChallenge, useUpdateDirectChallengeScore } from "@/hooks/use-direct-messages";
 import { useFriends } from "@/hooks/use-friends";
-import { useChatStreak, useUpdateChatStreak } from "@/hooks/use-chat-streaks";
+import { useChatStreak, useUpdateChatStreak, getDisplayChatStreak } from "@/hooks/use-chat-streaks";
 import { useTodoLabels } from "@/hooks/use-todo-labels";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -64,10 +64,10 @@ const FriendDetail = () => {
               </div>
               <h1 className="font-semibold text-foreground truncate">{friendProfile?.display_name || "Freund"}</h1>
             </button>
-            {(chatStreak as any)?.current_streak > 0 && (
+            {getDisplayChatStreak(chatStreak) > 0 && (
               <div className="flex items-center gap-1 ml-auto">
                 <Flame className="h-4 w-4 text-destructive" />
-                <span className="text-xs font-bold text-destructive">{(chatStreak as any).current_streak}</span>
+                <span className="text-xs font-bold text-destructive">{getDisplayChatStreak(chatStreak)}</span>
               </div>
             )}
           </div>

@@ -7,10 +7,12 @@ export function useGroupEvents(groupId: string | undefined) {
   return useQuery({
     queryKey: ["group-events", groupId],
     queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("group_events")
         .select("*, event_rsvps(*)")
         .eq("group_id", groupId!)
+        .gte("event_date", today)
         .order("event_date", { ascending: true });
       if (error) throw error;
       return data;
@@ -71,6 +73,40 @@ export function useCreateEvent(groupId: string | undefined) {
           })) as any
         );
       }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["group-events", groupId] }),
+  });
+}
+
+export function useUpdateEvent(groupId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: {
+      id: string;
+      name?: string;
+      description?: string;
+      event_date?: string;
+      start_time?: string;
+      end_time?: string | null;
+      location?: string | null;
+      location_url?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("group_events")
+        .update(updates as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["group-events", groupId] }),
+  });
+}
+
+export function useDeleteEvent(groupId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("group_events").delete().eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["group-events", groupId] }),
   });
