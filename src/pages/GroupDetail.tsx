@@ -116,7 +116,7 @@ const GroupDetail = () => {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {activeTab === "chat" && <ChatTab groupId={id} canChat={myMembership?.can_chat !== false} />}
+        {activeTab === "chat" && <ChatTab groupId={id} canChat={myMembership?.can_chat !== false} isAdmin={isAdmin} />}
         {activeTab === "todos" && <TodosTab groupId={id} canTodos={myMembership?.can_todos !== false} />}
         {activeTab === "challenges" && <ChallengesTab groupId={id} canChallenges={myMembership?.can_challenges !== false} />}
         {activeTab === "events" && <EventsTab groupId={id} canEvents={myMembership?.can_events !== false} />}
@@ -128,7 +128,7 @@ const GroupDetail = () => {
 };
 
 /* ============ CHAT TAB ============ */
-function ChatTab({ groupId, canChat }: { groupId: string; canChat: boolean }) {
+function ChatTab({ groupId, canChat, isAdmin }: { groupId: string; canChat: boolean; isAdmin: boolean }) {
   const { user } = useAuth();
   const { data: messages = [], isLoading } = useGroupMessages(groupId);
   const sendMessage = useSendMessage(groupId);
