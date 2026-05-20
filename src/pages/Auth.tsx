@@ -1,24 +1,33 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Capacitor } from "@capacitor/core";
 import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 
+type Method = "email" | "phone";
 
 const Auth = () => {
+  const [method, setMethod] = useState<Method>("email");
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpMode, setOtpMode] = useState<"signin" | "recovery">("signin");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const normalizePhone = (p: string) => {
+    const trimmed = p.trim().replace(/\s|-/g, "");
+    return trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -30,20 +39,90 @@ const Auth = () => {
           options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
-        toast({
-          title: "Willkommen!",
-          description: "Dein Account wurde erstellt.",
-        });
+        toast({ title: "Willkommen!", description: "Dein Account wurde erstellt." });
       }
-
     } catch (error: any) {
-      toast({
-        title: "Fehler",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const phoneE164 = normalizePhone(phone);
+      if (isLogin) {
+        // Login: try password first, fallback to OTP
+        if (password) {
+          const { error } = await supabase.auth.signInWithPassword({ phone: phoneE164, password });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.auth.signInWithOtp({ phone: phoneE164 });
+          if (error) throw error;
+          setOtpMode("signin");
+          setOtpSent(true);
+          toast({ title: "Code gesendet", description: "Prüfe deine SMS." });
+        }
+      } else {
+        const { error } = await supabase.auth.signUp({ phone: phoneE164, password });
+        if (error) throw error;
+        setOtpMode("signin");
+        setOtpSent(true);
+        toast({ title: "Code gesendet", description: "Bestätige deine Nummer per SMS." });
+      }
+    } catch (error: any) {
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const phoneE164 = normalizePhone(phone);
+      const type = otpMode === "recovery" ? "recovery" : "sms";
+      const { error } = await supabase.auth.verifyOtp({ phone: phoneE164, token: otp, type: type as any });
+      if (error) throw error;
+      if (otpMode === "recovery") {
+        // After recovery OTP, set a new password
+        if (!password) {
+          toast({ title: "Neues Passwort", description: "Gib unten ein neues Passwort ein und bestätige." });
+          setLoading(false);
+          return;
+        }
+        const { error: updErr } = await supabase.auth.updateUser({ password });
+        if (updErr) throw updErr;
+        toast({ title: "Passwort aktualisiert" });
+      }
+      setOtpSent(false);
+      setOtp("");
+    } catch (error: any) {
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhoneReset = async () => {
+    if (!phone) {
+      toast({ title: "Nummer eingeben", description: "Bitte gib zuerst deine Telefonnummer ein.", variant: "destructive" });
+      return;
+    }
+    try {
+      const phoneE164 = normalizePhone(phone);
+      // Send a recovery OTP via SMS
+      const { error } = await supabase.auth.signInWithOtp({ phone: phoneE164 });
+      if (error) throw error;
+      setOtpMode("recovery");
+      setOtpSent(true);
+      setPassword("");
+      toast({ title: "Code gesendet", description: "Bestätige per SMS und setze ein neues Passwort." });
+    } catch (error: any) {
+      toast({ title: "Fehler", description: error.message, variant: "destructive" });
     }
   };
 
@@ -100,73 +179,168 @@ const Auth = () => {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-3">
-            <Input
-              type="email"
-              placeholder="E-Mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
-            />
-            <Input
-              type="password"
-              placeholder="Passwort"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 rounded-xl text-sm font-medium"
+        {/* Method Toggle */}
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-secondary">
+          <button
+            type="button"
+            onClick={() => { setMethod("email"); setOtpSent(false); }}
+            className={`h-9 rounded-lg text-sm font-medium transition ${method === "email" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
           >
-            {loading ? "..." : isLogin ? "Anmelden" : "Registrieren"}
-          </Button>
-        </form>
+            E-Mail
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMethod("phone"); setOtpSent(false); }}
+            className={`h-9 rounded-lg text-sm font-medium transition ${method === "phone" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+          >
+            Telefon
+          </button>
+        </div>
 
-        {isLogin && (
-          <p className="text-center text-sm">
+        {/* Email Form */}
+        {method === "email" && (
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div className="space-y-3">
+              <Input
+                type="email"
+                placeholder="E-Mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
+              />
+              <Input
+                type="password"
+                placeholder="Passwort"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl text-sm font-medium">
+              {loading ? "..." : isLogin ? "Anmelden" : "Registrieren"}
+            </Button>
+            {isLogin && (
+              <p className="text-center text-sm">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!email) {
+                      toast({ title: "E-Mail eingeben", description: "Bitte gib zuerst deine E-Mail ein.", variant: "destructive" });
+                      return;
+                    }
+                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/reset-password`,
+                    });
+                    if (error) {
+                      toast({ title: "Fehler", description: error.message, variant: "destructive" });
+                    } else {
+                      toast({ title: "E-Mail gesendet", description: "Prüfe dein Postfach für den Reset-Link." });
+                    }
+                  }}
+                  className="text-muted-foreground underline underline-offset-4"
+                >
+                  Passwort vergessen?
+                </button>
+              </p>
+            )}
+          </form>
+        )}
+
+        {/* Phone Form */}
+        {method === "phone" && !otpSent && (
+          <form onSubmit={handlePhoneSubmit} className="space-y-4">
+            <div className="space-y-3">
+              <Input
+                type="tel"
+                placeholder="Telefon (+491701234567)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
+              />
+              <Input
+                type="password"
+                placeholder={isLogin ? "Passwort (optional, sonst SMS-Code)" : "Passwort"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required={!isLogin}
+                minLength={6}
+                className="h-12 rounded-xl bg-secondary border-0 text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl text-sm font-medium">
+              {loading ? "..." : isLogin ? "Anmelden" : "Registrieren"}
+            </Button>
+            {isLogin && (
+              <p className="text-center text-sm">
+                <button
+                  type="button"
+                  onClick={handlePhoneReset}
+                  className="text-muted-foreground underline underline-offset-4"
+                >
+                  Passwort vergessen?
+                </button>
+              </p>
+            )}
+          </form>
+        )}
+
+        {/* OTP Verification */}
+        {method === "phone" && otpSent && (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <p className="text-sm text-muted-foreground text-center">
+              {otpMode === "recovery"
+                ? "Gib den SMS-Code und ein neues Passwort ein."
+                : "Gib den SMS-Code zur Bestätigung ein."}
+            </p>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="SMS-Code"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              required
+              className="h-12 rounded-xl bg-secondary border-0 text-center tracking-widest"
+            />
+            {otpMode === "recovery" && (
+              <Input
+                type="password"
+                placeholder="Neues Passwort"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-12 rounded-xl bg-secondary border-0"
+              />
+            )}
+            <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl">
+              {loading ? "..." : "Bestätigen"}
+            </Button>
             <button
               type="button"
-              onClick={async () => {
-                if (!email) {
-                  toast({ title: "E-Mail eingeben", description: "Bitte gib zuerst deine E-Mail ein.", variant: "destructive" });
-                  return;
-                }
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/reset-password`,
-                });
-                if (error) {
-                  toast({ title: "Fehler", description: error.message, variant: "destructive" });
-                } else {
-                  toast({ title: "E-Mail gesendet", description: "Prüfe dein Postfach für den Reset-Link." });
-                }
-              }}
-              className="text-muted-foreground underline underline-offset-4"
+              onClick={() => { setOtpSent(false); setOtp(""); }}
+              className="w-full text-center text-sm text-muted-foreground underline underline-offset-4"
             >
-              Passwort vergessen?
+              Abbrechen
+            </button>
+          </form>
+        )}
+
+        {/* Toggle */}
+        {!otpSent && (
+          <p className="text-center text-sm text-muted-foreground">
+            {isLogin ? "Noch kein Account?" : "Bereits registriert?"}{" "}
+            <button
+              onClick={() => setIsLogin(!isLogin)}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              {isLogin ? "Registrieren" : "Anmelden"}
             </button>
           </p>
         )}
-
-
-        {/* Toggle */}
-        <p className="text-center text-sm text-muted-foreground">
-          {isLogin ? "Noch kein Account?" : "Bereits registriert?"}{" "}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="font-medium text-foreground underline underline-offset-4"
-          >
-            {isLogin ? "Registrieren" : "Anmelden"}
-          </button>
-        </p>
       </div>
     </div>
   );
