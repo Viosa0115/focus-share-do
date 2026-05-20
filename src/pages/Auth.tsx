@@ -51,6 +51,7 @@ const Auth = () => {
     if (!Capacitor.isNativePlatform()) return;
     try {
       GoogleAuth.initialize({
+        clientId: "348302225955-ehusea1m68cufui0tud2sv9b3e8b0qa9.apps.googleusercontent.com",
         scopes: ["profile", "email"],
         grantOfflineAccess: false,
       });
