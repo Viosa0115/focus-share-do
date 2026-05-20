@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Capacitor } from "@capacitor/core";
-import { Browser } from "@capacitor/browser";
-import { App as CapacitorApp } from "@capacitor/app";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
+
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
