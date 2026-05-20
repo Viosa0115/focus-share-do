@@ -63,6 +63,7 @@ const App = () => (
             <ReminderWrapper>
             <Routes>
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
               <Route path="/groups/:id" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
