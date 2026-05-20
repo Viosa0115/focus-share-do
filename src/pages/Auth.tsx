@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
+import { App as CapacitorApp } from "@capacitor/app";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,11 +46,58 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const sub = CapacitorApp.addListener("appUrlOpen", async ({ url }) => {
+      try {
+        const u = new URL(url);
+        // Supabase returns tokens in the hash fragment for implicit flow,
+        // or a `code` query param for PKCE.
+        const hash = u.hash.startsWith("#") ? u.hash.slice(1) : u.hash;
+        const hashParams = new URLSearchParams(hash);
+        const access_token = hashParams.get("access_token");
+        const refresh_token = hashParams.get("refresh_token");
+        const code = u.searchParams.get("code");
+
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+        } else if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        }
+      } catch (err) {
+        console.error("OAuth callback handling failed", err);
+      } finally {
+        try { await Browser.close(); } catch { /* noop */ }
+      }
     });
-    if (error) {
+    return () => {
+      sub.then((s) => s.remove());
+    };
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const redirectTo = `${window.location.origin}/auth`;
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+          },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          await Browser.open({ url: data.url, windowName: "_self" });
+        }
+        return;
+      }
+
+      const { error } = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (error) throw error;
+    } catch (error: any) {
       toast({ title: "Fehler", description: error.message, variant: "destructive" });
     }
   };
