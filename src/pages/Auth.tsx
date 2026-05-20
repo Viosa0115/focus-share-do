@@ -62,21 +62,9 @@ const Auth = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      if (Capacitor.isNativePlatform()) {
-        const result = await GoogleAuth.signIn();
-        const idToken = result?.authentication?.idToken;
-        if (!idToken) throw new Error("Kein idToken von Google erhalten");
-        const { error } = await supabase.auth.signInWithIdToken({
-          provider: "google",
-          token: idToken,
-        });
-        if (error) throw error;
-        return;
-      }
-
-
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
       });
       if (error) throw error;
     } catch (error: any) {
