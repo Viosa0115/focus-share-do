@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { useReminderChecker } from "@/hooks/use-reminders";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import Friends from "./pages/Friends";
