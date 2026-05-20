@@ -60,11 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) void ensureProfile(session.user);
         setLoading(false);
+
+        // Nach erfolgreichem OAuth-Login In-App-Browser schließen und App in den Vordergrund holen
+        if (event === "SIGNED_IN" && Capacitor.isNativePlatform()) {
+          Browser.close().catch(() => {});
+        }
       }
     );
 
