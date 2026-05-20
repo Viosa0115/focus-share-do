@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { useReminderChecker } from "@/hooks/use-reminders";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import Friends from "./pages/Friends";
@@ -62,6 +63,7 @@ const App = () => (
             <ReminderWrapper>
             <Routes>
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
               <Route path="/groups/:id" element={<ProtectedRoute><GroupDetail /></ProtectedRoute>} />
