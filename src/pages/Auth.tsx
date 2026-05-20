@@ -27,14 +27,15 @@ const Auth = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
         toast({
-          title: "Registrierung erfolgreich",
-          description: "Bitte überprüfe deine E-Mail, um deinen Account zu bestätigen.",
+          title: "Willkommen!",
+          description: "Dein Account wurde erstellt.",
         });
       }
+
     } catch (error: any) {
       toast({
         title: "Fehler",
